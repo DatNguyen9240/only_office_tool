@@ -6,14 +6,14 @@ import {
   ShareAltOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
-import { ProLayout } from "@ant-design/pro-components";
-import { useMemo, type ReactNode } from "react";
+import { ProLayout, type ProLayoutProps } from "@ant-design/pro-components";
+import { useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 
-const route = {
+const route: ProLayoutProps["route"] = {
   path: "/",
   children: [
     { path: "/dashboard", name: "Dashboard", icon: <DashboardOutlined /> },
@@ -39,6 +39,7 @@ export function AppLayout() {
   const setCollapsed = useAppStore((state) => state.setCollapsed);
 
   const selectedKeys = useMemo(() => [location.pathname], [location.pathname]);
+  const handleMenuClick = ({ key }: { key: string }) => navigate(key);
 
   return (
     <ProLayout
@@ -58,14 +59,9 @@ export function AppLayout() {
       collapsedButtonRender={false}
       onCollapse={setCollapsed}
       onMenuHeaderClick={() => navigate("/dashboard")}
-      menuItemRender={(item: { path?: string }, defaultDom: ReactNode) => (
-        <button
-          className="menu-link-button"
-          onClick={() => item.path && navigate(item.path)}
-        >
-          {defaultDom}
-        </button>
-      )}
+      menuProps={{
+        onClick: handleMenuClick,
+      }}
       menuFooterRender={() => <Sidebar collapsed={collapsed} />}
       token={{
         header: {

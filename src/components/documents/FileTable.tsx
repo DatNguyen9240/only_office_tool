@@ -213,9 +213,6 @@ export function FileTable({
           ? undefined
           : {
               columnWidth: 44,
-              getCheckboxProps: (record: DocumentItem) => ({
-                "aria-label": `Select ${record.name}`,
-              }),
             }
       }
       scroll={{ x: narrow ? 360 : 860 }}
