@@ -54,7 +54,6 @@ export function AppLayout() {
       selectedKeys={selectedKeys}
       breakpoint="lg"
       siderWidth={248}
-      headerHeight={64}
       headerRender={false}
       collapsedButtonRender={false}
       onCollapse={setCollapsed}
