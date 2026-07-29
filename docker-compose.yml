@@ -11,6 +11,6 @@ services:
       NODE_ENV: production
       PORT: 3000
     ports:
-      - "8082:3000"
+      - "5000:3000"
     init: true
     restart: unless-stopped

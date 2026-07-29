@@ -44,7 +44,7 @@ docker compose up -d api
 docker compose ps
 ```
 
-The API is exposed on host port `30389` (container port `3000`). Put it behind an HTTPS reverse proxy or
+The API is exposed on host port `5000` (container port `3000`). Put it behind an HTTPS reverse proxy or
 Cloudflare before setting `VITE_API_URL`.
 
 The frontend Dockerfile remains available for local production-image testing:
