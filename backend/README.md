@@ -69,5 +69,5 @@ docker compose ps
 
 Docker Desktop resolves `host.docker.internal` without an explicit Compose
 host mapping. PostgreSQL must listen on an address reachable from Docker and
-allow the Docker network in `pg_hba.conf`. The API uses host port `8082` and
+allow the Docker network in `pg_hba.conf`. The API uses host port `5000` and
 container port `3000`.
