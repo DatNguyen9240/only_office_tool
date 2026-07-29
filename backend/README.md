@@ -46,8 +46,9 @@ running is reported as `down` without preventing the API from starting.
 The repository-level Compose file runs only the backend API. The frontend is
 deployed separately by Vercel.
 
-On the remote server, create `backend/.env`. For PostgreSQL and ONLYOFFICE
-installed on the same host as Docker, use `host.docker.internal`:
+On a Windows server running Docker Desktop, create `backend/.env`. For
+PostgreSQL and ONLYOFFICE installed directly on Windows, use Docker Desktop's
+built-in `host.docker.internal` hostname:
 
 ```env
 NODE_ENV=production
@@ -66,6 +67,7 @@ docker compose up -d api
 docker compose ps
 ```
 
-Compose maps `host.docker.internal` to the Linux host gateway. PostgreSQL must
-listen on an address reachable from the Docker bridge and allow that network
-in `pg_hba.conf`. The API uses host port `30389` and container port `3000`.
+Docker Desktop resolves `host.docker.internal` without an explicit Compose
+host mapping. PostgreSQL must listen on an address reachable from Docker and
+allow the Docker network in `pg_hba.conf`. The API uses host port `30389` and
+container port `3000`.

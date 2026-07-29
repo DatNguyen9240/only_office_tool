@@ -12,7 +12,5 @@ services:
       PORT: 3000
     ports:
       - "30389:3000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     init: true
     restart: unless-stopped

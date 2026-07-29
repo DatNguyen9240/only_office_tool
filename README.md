@@ -23,8 +23,9 @@ Install command: npm ci
 
 Set `VITE_API_URL` in Vercel to the public HTTPS API URL.
 
-The backend runs in Docker on the remote server. Copy `backend/.env.example`
-to `backend/.env` and use host-accessible dependency URLs:
+The backend runs in Docker on the remote Windows server. Copy
+`backend/.env.example` to `backend/.env` and use Docker Desktop's built-in
+`host.docker.internal` hostname for services installed directly on Windows:
 
 ```env
 NODE_ENV=production
