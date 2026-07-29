@@ -96,6 +96,8 @@ model Document {
   @@index([ownerId])
   @@index([status])
   @@index([deletedAt])
+  @@index([deletedAt, folderId, updatedAt])
+  @@index([deletedAt, name])
 }
 
 model DocumentVersion {

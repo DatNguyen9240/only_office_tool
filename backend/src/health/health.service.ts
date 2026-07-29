@@ -6,18 +6,21 @@ import type {
   HealthResponse,
 } from "@share";
 import { PrismaService } from "../prisma/prisma.service";
+import { StorageService } from "../storage/storage.service";
 
 @Injectable()
 export class HealthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async check(): Promise<HealthResponse> {
-    const [database, onlyoffice] = await Promise.all([
+    const [database, onlyoffice, storage] = await Promise.all([
       this.checkDatabase(),
       this.checkOnlyOffice(),
+      this.storage.health(),
     ]);
     const requiredDependenciesReady = database === "up";
 
@@ -27,6 +30,7 @@ export class HealthService {
       services: {
         database,
         onlyoffice,
+        storage,
       },
     };
   }
@@ -37,6 +41,10 @@ export class HealthService {
 
   async onlyoffice(): Promise<DependencyHealthResponse> {
     return this.dependencyResponse("onlyoffice", await this.checkOnlyOffice());
+  }
+
+  async objectStorage(): Promise<DependencyHealthResponse> {
+    return this.dependencyResponse("storage", await this.storage.health());
   }
 
   private async checkDatabase(): Promise<DependencyStatus> {

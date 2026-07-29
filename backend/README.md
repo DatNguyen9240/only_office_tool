@@ -56,6 +56,14 @@ PORT=3000
 WEB_APP_URL=https://your-project.vercel.app
 DATABASE_URL=postgresql://meridian:password@host.docker.internal:5435/meridian_dms
 ONLYOFFICE_SERVER_URL=http://host.docker.internal:8080
+S3_ENDPOINT=http://host.docker.internal:9000
+S3_PUBLIC_ENDPOINT=https://files.example.com
+S3_REGION=us-east-1
+S3_ACCESS_KEY=minio
+S3_SECRET_KEY=change-me
+S3_BUCKET=meridian-documents
+S3_FORCE_PATH_STYLE=true
+S3_URL_TTL_SECONDS=900
 ```
 
 From the repository root:
@@ -71,3 +79,7 @@ Docker Desktop resolves `host.docker.internal` without an explicit Compose
 host mapping. PostgreSQL must listen on an address reachable from Docker and
 allow the Docker network in `pg_hba.conf`. The API uses host port `5000` and
 container port `3000`.
+
+File transfer uses presigned S3/MinIO URLs. The API only creates document
+metadata and versions; browsers upload and download bytes directly from
+`S3_PUBLIC_ENDPOINT`, avoiding an extra API hop and memory pressure in NestJS.

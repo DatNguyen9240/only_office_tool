@@ -82,11 +82,12 @@ export interface HealthResponse {
   services: {
     database: DependencyStatus;
     onlyoffice: DependencyStatus;
+    storage: DependencyStatus;
   };
 }
 
 export interface DependencyHealthResponse {
-  service: "database" | "onlyoffice";
+  service: "database" | "onlyoffice" | "storage";
   status: DependencyStatus;
   timestamp: string;
 }

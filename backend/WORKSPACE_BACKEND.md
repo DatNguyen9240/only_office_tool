@@ -140,10 +140,14 @@ GET    /auth/me
 
 GET    /documents?scope=all|shared|trash&folderId=...
 POST   /documents/upload
+POST   /documents/upload-url
+POST   /documents/:id/upload-complete
+GET    /documents/:id/download-url
 GET    /documents/:id
 PATCH  /documents/:id
 DELETE /documents/:id
 POST   /documents/:id/restore
+POST   /documents/:id/star
 DELETE /documents/:id/permanent
 POST   /documents/:id/star
 GET    /documents/:id/download
@@ -163,6 +167,13 @@ POST   /documents/:id/onlyoffice/callback
 GET    /admin/users
 PATCH  /admin/users/:id
 GET    /admin/audit
+
+GET    /folders?parentId=...
+POST   /folders
+PATCH  /folders/:id
+DELETE /folders/:id
+
+GET    /health/storage
 ```
 
 Responses should preserve the public field names in `share/index.d.ts`

@@ -19,4 +19,9 @@ export class HealthController {
   onlyoffice() {
     return this.healthService.onlyoffice();
   }
+
+  @Get("storage")
+  storage() {
+    return this.healthService.objectStorage();
+  }
 }
