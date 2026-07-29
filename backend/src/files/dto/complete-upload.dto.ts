@@ -5,9 +5,6 @@ export class CompleteUploadDto {
   @IsString()
   objectKey!: string;
 
-  @IsString()
-  authorId!: string;
-
   @Type(() => Number)
   @IsInt()
   @Min(1)

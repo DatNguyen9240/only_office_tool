@@ -8,16 +8,22 @@ import {
   Patch,
   Post,
   Query,
+  UseGuards,
 } from "@nestjs/common";
+import type { AuthenticatedUser } from "../auth/auth.types";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { DocumentsService } from "./documents.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 
+@UseGuards(JwtAuthGuard)
 @Controller("documents")
 export class DocumentsController {
   constructor(private readonly documents: DocumentsService) {}
 
   @Get()
   list(
+    @CurrentUser() user: AuthenticatedUser,
     @Query("scope") scope = "all",
     @Query("folderId") folderId?: string,
     @Query("q") search?: string,
@@ -32,6 +38,7 @@ export class DocumentsController {
       : 100;
     return this.documents.list(
       scope as "all" | "shared" | "trash",
+      user,
       folderId,
       search,
       limit,
@@ -39,27 +46,31 @@ export class DocumentsController {
   }
 
   @Get(":id")
-  get(@Param("id") id: string) {
-    return this.documents.getById(id);
+  get(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.documents.getById(id, user);
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() input: UpdateDocumentDto) {
-    return this.documents.update(id, input);
+  update(
+    @Param("id") id: string,
+    @Body() input: UpdateDocumentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.update(id, input, user);
   }
 
   @Delete(":id")
-  remove(@Param("id") id: string) {
-    return this.documents.softDelete(id);
+  remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.documents.softDelete(id, user);
   }
 
   @Post(":id/restore")
-  restore(@Param("id") id: string) {
-    return this.documents.restore(id);
+  restore(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.documents.restore(id, user);
   }
 
   @Post(":id/star")
-  star(@Param("id") id: string) {
-    return this.documents.toggleStar(id);
+  star(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.documents.toggleStar(id, user);
   }
 }

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { DocumentType, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { CompleteUploadDto } from "./dto/complete-upload.dto";
@@ -27,19 +28,30 @@ export class FilesService {
     private readonly storage: StorageService,
   ) {}
 
-  async createUploadUrl(input: CreateUploadUrlDto) {
+  async createUploadUrl(
+    input: CreateUploadUrlDto,
+    user: AuthenticatedUser,
+  ) {
     const type = documentTypes[input.contentType];
     if (!type) throw new BadRequestException("Unsupported content type");
 
     const extension = input.name.includes(".")
       ? input.name.slice(input.name.lastIndexOf(".")).toLowerCase()
       : "";
-    const objectKey = `documents/${input.ownerId}/${randomUUID()}${extension}`;
+    if (input.folderId) {
+      const folder = await this.prisma.folder.findFirst({
+        where: { id: input.folderId, ownerId: user.id },
+        select: { id: true },
+      });
+      if (!folder) throw new NotFoundException("Folder not found");
+    }
+
+    const objectKey = `documents/${user.id}/${randomUUID()}${extension}`;
     const document = await this.prisma.document.create({
       data: {
         name: input.name,
         type,
-        ownerId: input.ownerId,
+        ownerId: user.id,
         folderId: input.folderId,
       },
       select: { id: true },
@@ -62,9 +74,16 @@ export class FilesService {
     };
   }
 
-  async completeUpload(documentId: string, input: CompleteUploadDto) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: documentId },
+  async completeUpload(
+    documentId: string,
+    input: CompleteUploadDto,
+    user: AuthenticatedUser,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id: documentId,
+        ...(user.role === "ADMINISTRATOR" ? {} : { ownerId: user.id }),
+      },
       select: { id: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
@@ -94,7 +113,7 @@ export class FilesService {
           objectKey: input.objectKey,
           sizeBytes: BigInt(head.ContentLength ?? 0),
           checksum: head.ETag?.replaceAll('"', "") ?? null,
-          authorId: input.authorId,
+          authorId: user.id,
         },
         select: { id: true, version: true, sizeBytes: true, createdAt: true },
       });
@@ -113,9 +132,28 @@ export class FilesService {
     };
   }
 
-  async createDownloadUrl(documentId: string) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: documentId },
+  async createDownloadUrl(
+    documentId: string,
+    user: AuthenticatedUser,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id: documentId,
+        ...(user.role === "ADMINISTRATOR"
+          ? {}
+          : {
+              OR: [
+                { ownerId: user.id },
+                {
+                  permissions: {
+                    some: {
+                      OR: [{ userId: user.id }, { email: user.email }],
+                    },
+                  },
+                },
+              ],
+            }),
+      },
       select: {
         id: true,
         name: true,

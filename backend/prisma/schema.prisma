@@ -45,6 +45,7 @@ model User {
   id            String               @id @default(cuid())
   email         String               @unique
   name          String
+  passwordHash  String?
   department    String?
   role          UserRole             @default(EMPLOYEE)
   status        UserStatus           @default(ACTIVE)
@@ -56,6 +57,21 @@ model User {
   versions      DocumentVersion[]    @relation("VersionAuthor")
   auditLogs     AuditLog[]           @relation("AuditActor")
   folders       Folder[]             @relation("FolderOwner")
+  refreshSessions RefreshSession[]
+}
+
+model RefreshSession {
+  id        String    @id
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Folder {

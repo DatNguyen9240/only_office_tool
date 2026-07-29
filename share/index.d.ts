@@ -63,6 +63,23 @@ export interface UserRecord {
   lastActive: string;
 }
 
+export type AuthRole = "EMPLOYEE" | "MANAGER" | "ADMINISTRATOR";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: AuthRole;
+}
+
+export interface AuthTokensResponse {
+  tokenType: "Bearer";
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  user: AuthUser;
+}
+
 export interface AuditRecord {
   id: string;
   timestamp: string;

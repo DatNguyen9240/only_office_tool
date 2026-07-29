@@ -5,9 +5,6 @@ export class CreateFolderDto {
   @Length(1, 255)
   name!: string;
 
-  @IsString()
-  ownerId!: string;
-
   @IsOptional()
   @IsString()
   parentId?: string;

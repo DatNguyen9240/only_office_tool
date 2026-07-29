@@ -11,9 +11,12 @@ import { UpdateFolderDto } from "./dto/update-folder.dto";
 export class FoldersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(parentId?: string) {
+  async list(ownerId: string, parentId?: string) {
     const folders = await this.prisma.folder.findMany({
-      where: parentId === undefined ? {} : { parentId: parentId || null },
+      where: {
+        ownerId,
+        ...(parentId === undefined ? {} : { parentId: parentId || null }),
+      },
       include: { _count: { select: { documents: true, children: true } } },
       orderBy: { name: "asc" },
     });
@@ -26,19 +29,21 @@ export class FoldersService {
     }));
   }
 
-  async create(input: CreateFolderDto) {
+  async create(input: CreateFolderDto, ownerId: string) {
+    if (input.parentId) await this.ensureFolder(input.parentId, ownerId);
     const folder = await this.prisma.folder.create({
       data: {
         name: input.name,
-        ownerId: input.ownerId,
+        ownerId,
         ...(input.parentId ? { parentId: input.parentId } : {}),
       },
     });
     return { id: folder.id, name: folder.name, parentId: folder.parentId ?? undefined, count: 0 };
   }
 
-  async update(id: string, input: UpdateFolderDto) {
-    await this.ensureFolder(id);
+  async update(id: string, input: UpdateFolderDto, ownerId: string) {
+    await this.ensureFolder(id, ownerId);
+    if (input.parentId) await this.ensureFolder(input.parentId, ownerId);
     const folder = await this.prisma.folder.update({
       where: { id },
       data: {
@@ -55,9 +60,9 @@ export class FoldersService {
     };
   }
 
-  async remove(id: string) {
-    const folder = await this.prisma.folder.findUnique({
-      where: { id },
+  async remove(id: string, ownerId: string) {
+    const folder = await this.prisma.folder.findFirst({
+      where: { id, ownerId },
       include: { _count: { select: { documents: true, children: true } } },
     });
     if (!folder) throw new NotFoundException("Folder not found");
@@ -68,9 +73,9 @@ export class FoldersService {
     return { id, status: "deleted" as const };
   }
 
-  private async ensureFolder(id: string) {
-    const folder = await this.prisma.folder.findUnique({
-      where: { id },
+  private async ensureFolder(id: string, ownerId: string) {
+    const folder = await this.prisma.folder.findFirst({
+      where: { id, ownerId },
       select: { id: true },
     });
     if (!folder) throw new NotFoundException("Folder not found");

@@ -9,6 +9,7 @@ import type {
   DocumentStatus as PublicDocumentStatus,
   DocumentType as PublicDocumentType,
 } from "@share";
+import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 
@@ -35,6 +36,7 @@ export class DocumentsService {
 
   async list(
     scope: DocumentScope,
+    user: AuthenticatedUser,
     folderId?: string,
     search?: string,
     limit = 100,
@@ -48,8 +50,11 @@ export class DocumentsService {
         ? { name: { contains: search, mode: "insensitive" } }
         : {}),
       ...(scope === "shared"
-        ? { permissions: { some: {} } }
-        : {}),
+        ? {
+            ownerId: { not: user.id },
+            permissions: { some: this.permissionWhere(user) },
+          }
+        : { OR: this.accessWhere(user) }),
     };
 
     const documents = await this.prisma.document.findMany({
@@ -63,6 +68,7 @@ export class DocumentsService {
           select: { sizeBytes: true },
         },
         permissions: {
+          where: this.permissionWhere(user),
           take: 1,
           select: { role: true },
         },
@@ -71,12 +77,15 @@ export class DocumentsService {
       take: limit,
     });
 
-    return documents.map((document) => this.toPublicItem(document));
+    return documents.map((document) => this.toPublicItem(document, user.id));
   }
 
-  async getById(id: string): Promise<DocumentItem> {
-    const document = await this.prisma.document.findUnique({
-      where: { id },
+  async getById(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    const document = await this.prisma.document.findFirst({
+      where: { id, OR: this.accessWhere(user) },
       include: {
         owner: { select: { name: true } },
         folder: { select: { id: true } },
@@ -86,6 +95,7 @@ export class DocumentsService {
           select: { sizeBytes: true },
         },
         permissions: {
+          where: this.permissionWhere(user),
           take: 1,
           select: { role: true },
         },
@@ -93,11 +103,15 @@ export class DocumentsService {
     });
 
     if (!document) throw new NotFoundException("Document not found");
-    return this.toPublicItem(document);
+    return this.toPublicItem(document, user.id);
   }
 
-  async update(id: string, input: UpdateDocumentDto): Promise<DocumentItem> {
-    await this.ensureDocument(id);
+  async update(
+    id: string,
+    input: UpdateDocumentDto,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    await this.ensureOwnedDocument(id, user);
     const document = await this.prisma.document.update({
       where: { id },
       data: {
@@ -105,14 +119,17 @@ export class DocumentsService {
         ...(input.folderId === undefined ? {} : { folderId: input.folderId }),
         ...(input.starred === undefined ? {} : { starred: input.starred }),
       },
-      include: this.publicInclude(),
+      include: this.publicInclude(user),
     });
 
-    return this.toPublicItem(document);
+    return this.toPublicItem(document, user.id);
   }
 
-  async softDelete(id: string): Promise<{ id: string; status: "deleted" }> {
-    await this.ensureDocument(id);
+  async softDelete(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<{ id: string; status: "deleted" }> {
+    await this.ensureOwnedDocument(id, user);
     await this.prisma.document.update({
       where: { id },
       data: { deletedAt: new Date(), status: DocumentStatus.DELETED },
@@ -120,19 +137,22 @@ export class DocumentsService {
     return { id, status: "deleted" };
   }
 
-  async restore(id: string): Promise<DocumentItem> {
-    await this.ensureDocument(id);
+  async restore(id: string, user: AuthenticatedUser): Promise<DocumentItem> {
+    await this.ensureOwnedDocument(id, user);
     const document = await this.prisma.document.update({
       where: { id },
       data: { deletedAt: null, status: DocumentStatus.READY },
-      include: this.publicInclude(),
+      include: this.publicInclude(user),
     });
-    return this.toPublicItem(document);
+    return this.toPublicItem(document, user.id);
   }
 
-  async toggleStar(id: string): Promise<DocumentItem> {
-    const current = await this.prisma.document.findUnique({
-      where: { id },
+  async toggleStar(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    const current = await this.prisma.document.findFirst({
+      where: { id, ...this.ownerWhere(user) },
       select: { starred: true },
     });
     if (!current) throw new NotFoundException("Document not found");
@@ -140,20 +160,20 @@ export class DocumentsService {
     const document = await this.prisma.document.update({
       where: { id },
       data: { starred: !current.starred },
-      include: this.publicInclude(),
+      include: this.publicInclude(user),
     });
-    return this.toPublicItem(document);
+    return this.toPublicItem(document, user.id);
   }
 
-  private async ensureDocument(id: string) {
-    const document = await this.prisma.document.findUnique({
-      where: { id },
+  private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, ...this.ownerWhere(user) },
       select: { id: true },
     });
     if (!document) throw new NotFoundException("Document not found");
   }
 
-  private publicInclude() {
+  private publicInclude(user: AuthenticatedUser) {
     return {
       owner: { select: { name: true } },
       folder: { select: { id: true } },
@@ -163,6 +183,7 @@ export class DocumentsService {
         select: { sizeBytes: true },
       },
       permissions: {
+        where: this.permissionWhere(user),
         take: 1,
         select: { role: true },
       },
@@ -173,8 +194,12 @@ export class DocumentsService {
     document: Prisma.DocumentGetPayload<{
       include: ReturnType<DocumentsService["publicInclude"]>;
     }>,
+    userId: string,
   ): DocumentItem {
-    const permission = document.permissions[0]?.role;
+    const permission =
+      document.ownerId === userId
+        ? PermissionRole.OWNER
+        : document.permissions[0]?.role;
     return {
       id: document.id,
       name: document.name,
@@ -193,6 +218,24 @@ export class DocumentsService {
         ? { permission: this.toPublicPermission(permission) }
         : {}),
     };
+  }
+
+  private permissionWhere(user: AuthenticatedUser) {
+    return {
+      OR: [{ userId: user.id }, { email: user.email }],
+    } satisfies Prisma.DocumentPermissionWhereInput;
+  }
+
+  private accessWhere(user: AuthenticatedUser) {
+    if (user.role === "ADMINISTRATOR") return [{}];
+    return [
+      { ownerId: user.id },
+      { permissions: { some: this.permissionWhere(user) } },
+    ] satisfies Prisma.DocumentWhereInput[];
+  }
+
+  private ownerWhere(user: AuthenticatedUser): Prisma.DocumentWhereInput {
+    return user.role === "ADMINISTRATOR" ? {} : { ownerId: user.id };
   }
 
   private toPublicPermission(role: PermissionRole) {
