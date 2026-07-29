@@ -54,10 +54,11 @@ export class HealthService {
 
     try {
       const response = await fetch(
-        `${baseUrl.replace(/\/$/, "")}/web-apps/apps/api/documents/api.js`,
+        `${baseUrl.replace(/\/$/, "")}/healthcheck`,
         { signal: AbortSignal.timeout(3000) },
       );
-      return response.ok ? "up" : "down";
+      const body = await response.text();
+      return response.ok && body.trim() === "true" ? "up" : "down";
     } catch {
       return "down";
     }
