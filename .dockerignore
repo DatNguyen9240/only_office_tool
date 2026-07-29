@@ -1,0 +1,14 @@
+.git
+.agents
+backend
+**/node_modules
+**/dist
+*.log
+frontend/.env
+frontend/.env.*
+frontend/DESIGN_SPEC.md
+frontend/WORKSPACE_DESIGN_SPEC.md
+frontend/README.md
+frontend/vercel.json
+WORKSPACE_BACKEND.md
+README.md

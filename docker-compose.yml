@@ -1,0 +1,9 @@
+services:
+  meridian-dms-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: meridian-dms-frontend:latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped

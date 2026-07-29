@@ -6,20 +6,46 @@ Ant Design Pro, Zustand, and TanStack Query.
 ## Run locally
 
 ```bash
+cd frontend
 npm install
 npm run dev
+```
+
+## Run frontend with Docker
+
+Build and start the frontend production container:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:8080](http://localhost:8080). The container serves the
+Vite build with Nginx and includes SPA fallback routing for all application
+routes. Stop it with:
+
+```bash
+docker compose down
+```
+
+To build and run without Compose:
+
+```bash
+docker build -f frontend/Dockerfile -t meridian-dms-frontend .
+docker run --rm -p 8080:8080 meridian-dms-frontend
 ```
 
 Production verification:
 
 ```bash
+cd frontend
 npm run lint
 npm run typecheck
 npm run build
 ```
 
 The workspace includes persisted English/Vietnamese language selection and
-system, light, and dark theme modes. Translation resources live in `src/i18n`.
+system, light, and dark theme modes. Translation resources live in
+`frontend/src/i18n`.
 
 ## Routes
 
@@ -35,36 +61,31 @@ system, light, and dark theme modes. Translation resources live in `src/i18n`.
 
 ## ONLYOFFICE integration
 
-Copy `.env.example` to `.env.local` and configure:
-
-- `VITE_ONLYOFFICE_SERVER_URL`: Base URL of the ONLYOFFICE Document Server.
-- `VITE_SAMPLE_DOCUMENT_URL`: Public or signed URL of the document to edit.
-
-The editor route loads `web-apps/apps/api/documents/api.js` from the configured
-Document Server and creates a `DocsAPI.DocEditor` instance. Without these
-variables, the route uses a clearly labeled preview mode.
-
-For a production backend, replace the sample document configuration with a
-server-generated editor config and signed callback URL. Document keys must
-change whenever the source file changes.
+The editor currently stays in a clearly labeled preview mode. A production
+backend should provide a per-document ONLYOFFICE editor config, including a
+signed document URL, a changing document key for each version, and a callback
+URL for saving new versions.
 
 ## Architecture
 
-- `src/app`: providers, routing, and theme
-- `src/components/layout`: application shell
-- `src/components/documents`: document-management components
-- `src/components/workspace`: employee workspace navigation, browser, and details
-- `src/components/editor`: ONLYOFFICE integration boundary
-- `src/pages`: route-level screens
-- `src/store`: Zustand UI state
-- `src/i18n`: typed English and Vietnamese translation resources
-- `src/hooks`: TanStack Query data access
-- `src/data`: sample API data for the frontend prototype
-- `DESIGN_SPEC.md`: product design and UX specification
-- `WORKSPACE_DESIGN_SPEC.md`: employee workspace design system and UX flows
+- `frontend/src/app`: providers, routing, and theme
+- `frontend/src/components/layout`: application shell
+- `frontend/src/components/documents`: document-management components
+- `frontend/src/components/workspace`: employee workspace navigation, browser, and details
+- `frontend/src/components/editor`: ONLYOFFICE integration boundary
+- `frontend/src/pages`: route-level screens
+- `frontend/src/store`: Zustand UI state
+- `frontend/src/i18n`: typed English and Vietnamese translation resources
+- `frontend/src/hooks`: TanStack Query data access
+- `frontend/src/data`: sample API data for the frontend prototype
+- `backend`: NestJS backend foundation and Prisma schema
+- `share`: shared public API types used by frontend and backend
+- `frontend/DESIGN_SPEC.md`: product design and UX specification
+- `frontend/WORKSPACE_DESIGN_SPEC.md`: employee workspace design system and UX flows
+- `backend/WORKSPACE_BACKEND.md`: backend architecture and implementation workspace
 
 ## Current data layer
 
 The included dataset is sample workspace data. Replace the query functions in
-`src/hooks` with API clients while keeping query keys and route components
-stable.
+`frontend/src/hooks` with API clients while keeping query keys and route
+components stable.

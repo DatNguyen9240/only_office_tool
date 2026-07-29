@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  EMPLOYEE
+  MANAGER
+  ADMINISTRATOR
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum DocumentType {
+  DOCX
+  XLSX
+  PPTX
+  PDF
+  FOLDER
+}
+
+enum DocumentStatus {
+  READY
+  REVIEW
+  LOCKED
+  DELETED
+}
+
+enum PermissionRole {
+  VIEWER
+  COMMENTER
+  EDITOR
+  OWNER
+}
+
+model User {
+  id            String               @id @default(cuid())
+  email         String               @unique
+  name          String
+  department    String?
+  role          UserRole             @default(EMPLOYEE)
+  status        UserStatus           @default(ACTIVE)
+  lastActiveAt  DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  ownedDocuments Document[]          @relation("DocumentOwner")
+  permissions   DocumentPermission[]
+  versions      DocumentVersion[]    @relation("VersionAuthor")
+  auditLogs     AuditLog[]           @relation("AuditActor")
+  folders       Folder[]             @relation("FolderOwner")
+}
+
+model Folder {
+  id        String    @id @default(cuid())
+  name      String
+  parentId  String?
+  ownerId   String
+  parent    Folder?   @relation("FolderTree", fields: [parentId], references: [id])
+  children  Folder[]  @relation("FolderTree")
+  owner     User      @relation("FolderOwner", fields: [ownerId], references: [id])
+  documents Document[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([parentId])
+  @@index([ownerId])
+}
+
+model Document {
+  id               String               @id @default(cuid())
+  name             String
+  type             DocumentType
+  status           DocumentStatus       @default(READY)
+  folderId         String?
+  ownerId          String
+  starred          Boolean              @default(false)
+  currentVersionId String?
+  folder           Folder?              @relation(fields: [folderId], references: [id])
+  owner            User                 @relation("DocumentOwner", fields: [ownerId], references: [id])
+  versions         DocumentVersion[]
+  permissions      DocumentPermission[]
+  shareLinks       ShareLink[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
+
+  @@index([folderId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model DocumentVersion {
+  id           String   @id @default(cuid())
+  documentId   String
+  version      Int
+  objectKey    String
+  sizeBytes    BigInt
+  checksum     String?
+  note         String?
+  authorId     String
+  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author       User     @relation("VersionAuthor", fields: [authorId], references: [id])
+  createdAt    DateTime @default(now())
+
+  @@unique([documentId, version])
+  @@index([documentId, createdAt])
+}
+
+model DocumentPermission {
+  id         String         @id @default(cuid())
+  documentId String
+  userId     String?
+  email      String?
+  role       PermissionRole
+  grantedById String
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User?          @relation(fields: [userId], references: [id])
+  createdAt  DateTime       @default(now())
+
+  @@unique([documentId, email])
+  @@index([userId])
+}
+
+model ShareLink {
+  id         String         @id @default(cuid())
+  documentId String
+  tokenHash  String         @unique
+  permission PermissionRole @default(VIEWER)
+  expiresAt  DateTime?
+  createdById String
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+  revokedAt  DateTime?
+
+  @@index([documentId])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  timestamp    DateTime @default(now())
+  actorId      String?
+  action       String
+  resourceType String
+  resourceId   String?
+  outcome      String
+  ip           String?
+  userAgent    String?
+  metadata     Json?
+  actor        User?    @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+}
