@@ -16,7 +16,7 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
   const port = config.get<number>("PORT", 3000);
-  await app.listen(port);
+  await app.listen(port, "0.0.0.0");
   console.log(`Meridian DMS API listening on http://localhost:${port}/api`);
 }
 
