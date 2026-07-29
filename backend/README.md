@@ -40,3 +40,32 @@ GET http://localhost:3000/api/health/onlyoffice
 
 They report PostgreSQL and ONLYOFFICE independently. A dependency that is not
 running is reported as `down` without preventing the API from starting.
+
+## Docker deployment
+
+The repository-level Compose file runs only the backend API. The frontend is
+deployed separately by Vercel.
+
+On the remote server, create `backend/.env`. For PostgreSQL and ONLYOFFICE
+installed on the same host as Docker, use `host.docker.internal`:
+
+```env
+NODE_ENV=production
+PORT=3000
+WEB_APP_URL=https://your-project.vercel.app
+DATABASE_URL=postgresql://meridian:password@host.docker.internal:5435/meridian_dms
+ONLYOFFICE_SERVER_URL=http://host.docker.internal:8080
+```
+
+From the repository root:
+
+```bash
+docker compose build api
+docker compose run --rm api npm run prisma:deploy
+docker compose up -d api
+docker compose ps
+```
+
+Compose maps `host.docker.internal` to the Linux host gateway. PostgreSQL must
+listen on an address reachable from the Docker bridge and allow that network
+in `pg_hba.conf`. The API uses host port `30389` and container port `3000`.

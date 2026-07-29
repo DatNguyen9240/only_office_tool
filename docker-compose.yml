@@ -1,9 +1,18 @@
 services:
-  meridian-dms-frontend:
+  api:
     build:
       context: .
-      dockerfile: frontend/Dockerfile
-    image: meridian-dms-frontend:latest
+      dockerfile: backend/Dockerfile
+    image: meridian-dms-api:latest
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 3000
     ports:
-      - "8080:8080"
+      - "30389:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    init: true
     restart: unless-stopped

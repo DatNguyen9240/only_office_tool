@@ -11,23 +11,42 @@ npm install
 npm run dev
 ```
 
-## Run frontend with Docker
+## Deployment
 
-Build and start the frontend production container:
+The frontend is deployed by Vercel from the `frontend` root directory:
 
-```bash
-docker compose up --build
+```text
+Build command: npm run build
+Output directory: dist
+Install command: npm ci
 ```
 
-Open [http://localhost:8080](http://localhost:8080). The container serves the
-Vite build with Nginx and includes SPA fallback routing for all application
-routes. Stop it with:
+Set `VITE_API_URL` in Vercel to the public HTTPS API URL.
 
-```bash
-docker compose down
+The backend runs in Docker on the remote server. Copy `backend/.env.example`
+to `backend/.env` and use host-accessible dependency URLs:
+
+```env
+NODE_ENV=production
+PORT=3000
+WEB_APP_URL=https://your-project.vercel.app
+DATABASE_URL=postgresql://meridian:password@host.docker.internal:5435/meridian_dms
+ONLYOFFICE_SERVER_URL=http://host.docker.internal:8080
 ```
 
-To build and run without Compose:
+Deploy the database migration and API:
+
+```bash
+docker compose build api
+docker compose run --rm api npm run prisma:deploy
+docker compose up -d api
+docker compose ps
+```
+
+The API is exposed on host port `30389` (container port `3000`). Put it behind an HTTPS reverse proxy or
+Cloudflare before setting `VITE_API_URL`.
+
+The frontend Dockerfile remains available for local production-image testing:
 
 ```bash
 docker build -f frontend/Dockerfile -t meridian-dms-frontend .
@@ -39,6 +58,10 @@ Production verification:
 ```bash
 cd frontend
 npm run lint
+npm run typecheck
+npm run build
+
+cd ../backend
 npm run typecheck
 npm run build
 ```

@@ -1,0 +1,12 @@
+.git
+.agents
+frontend
+**/node_modules
+**/dist
+*.log
+backend/.env
+backend/.env.*
+backend/README.md
+backend/WORKSPACE_BACKEND.md
+README.md
+docker-compose.yml

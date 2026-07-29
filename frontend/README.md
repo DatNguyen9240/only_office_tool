@@ -19,7 +19,18 @@ npm run build
 
 ## Docker
 
-From the repository root:
+The production frontend is intended for Vercel:
+
+```text
+Root directory: frontend
+Build command: npm run build
+Output directory: dist
+Install command: npm ci
+```
+
+Set `VITE_API_URL` in the Vercel project environment.
+
+For local production-image testing, run from the repository root:
 
 ```bash
 docker build -f frontend/Dockerfile -t meridian-dms-frontend .
