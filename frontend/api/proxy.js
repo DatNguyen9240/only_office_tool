@@ -6,9 +6,11 @@
 const BACKEND = "http://103.190.38.46/api";
 
 export default async function handler(req, res) {
-  // path được truyền qua query string từ vercel.json routes
-  const pathStr = req.query.path || "";
-  const qs = req.query.qs || "";
+  // Thu thập toàn bộ query parameters ngoại trừ "path" để chuyển tiếp lên backend
+  const queryParams = { ...req.query };
+  delete queryParams.path;
+  const searchParams = new URLSearchParams(queryParams);
+  const qs = searchParams.toString();
 
   const target = `${BACKEND}/${pathStr}${qs ? `?${qs}` : ""}`;
 
