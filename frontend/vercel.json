@@ -8,8 +8,14 @@
   },
   "rewrites": [
     {
-      "source": "/api/((?!proxy\\.js$).*)",
-      "destination": "/api/proxy.js?path=$1"
+      "source": "/api/:path*",
+      "missing": [
+        {
+          "type": "query",
+          "key": "proxied"
+        }
+      ],
+      "destination": "/api/proxy?path=:path*&proxied=true"
     },
     {
       "source": "/((?!api/).*)",
