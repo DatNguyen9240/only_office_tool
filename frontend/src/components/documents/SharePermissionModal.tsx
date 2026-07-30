@@ -20,6 +20,7 @@ import {
 import { useState } from "react";
 import { permissions as initialPermissions } from "@/data/sampleData";
 import { useI18n } from "@/i18n";
+import { apiRequest, isApiConfigured } from "@/lib/api";
 import type { DocumentItem, PermissionEntry, PermissionRole } from "@share";
 
 interface SharePermissionModalProps {
@@ -53,6 +54,19 @@ export function SharePermissionModal({
   const invite = async () => {
     const values = await form.validateFields();
     const email = String(values.email);
+
+    if (isApiConfigured && document?.id) {
+      try {
+        const role = String(values.role).toUpperCase();
+        await apiRequest(`/documents/${document.id}/permissions`, {
+          method: "POST",
+          body: JSON.stringify({ email, role }),
+        });
+      } catch (err) {
+        console.warn("Share API failed:", err);
+      }
+    }
+
     setEntries((current) => [
       ...current,
       {

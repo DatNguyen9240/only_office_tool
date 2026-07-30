@@ -92,6 +92,42 @@ export class DocumentsController {
     return this.documents.handleCallback(id, body);
   }
 
+  @Post(":id/permissions")
+  addPermission(
+    @Param("id") id: string,
+    @Body("email") email: string,
+    @Body("role") role: "VIEWER" | "COMMENTER" | "EDITOR",
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.addPermission(id, email, role, user);
+  }
+
+  @Delete(":id/permissions/:permissionId")
+  removePermission(
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.removePermission(id, permissionId, user);
+  }
+
+  @Get(":id/versions")
+  getVersions(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.getVersions(id, user);
+  }
+
+  @Post(":id/versions/:versionNumber/restore")
+  restoreVersion(
+    @Param("id") id: string,
+    @Param("versionNumber") versionNumber: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.restoreVersion(id, Number(versionNumber), user);
+  }
+
   @Patch(":id")
   update(
     @Param("id") id: string,

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
   DocumentStatus,
+  DocumentType,
   PermissionRole,
   Prisma,
 } from "@prisma/client";
@@ -75,20 +76,7 @@ export class DocumentsService {
 
     const documents = await this.prisma.document.findMany({
       where,
-      include: {
-        owner: { select: { name: true } },
-        folder: { select: { id: true } },
-        versions: {
-          orderBy: { version: "desc" },
-          take: 1,
-          select: { sizeBytes: true },
-        },
-        permissions: {
-          where: this.permissionWhere(user),
-          take: 1,
-          select: { role: true },
-        },
-      },
+      include: this.publicInclude(user),
       orderBy: { updatedAt: "desc" },
       take: limit,
     });
@@ -102,20 +90,7 @@ export class DocumentsService {
   ): Promise<DocumentItem> {
     const document = await this.prisma.document.findFirst({
       where: { id, OR: this.accessWhere(user) },
-      include: {
-        owner: { select: { name: true } },
-        folder: { select: { id: true } },
-        versions: {
-          orderBy: { version: "desc" },
-          take: 1,
-          select: { sizeBytes: true },
-        },
-        permissions: {
-          where: this.permissionWhere(user),
-          take: 1,
-          select: { role: true },
-        },
-      },
+      include: this.publicInclude(user),
     });
 
     if (!document) throw new NotFoundException("Document not found");
@@ -258,31 +233,34 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
     const ext = file.originalname.split(".").pop()?.toLowerCase() || "docx";
+    let docType: DocumentType = DocumentType.DOCX;
+    if (["xlsx", "xls", "csv"].includes(ext)) docType = DocumentType.XLSX;
+    else if (["pptx", "ppt"].includes(ext)) docType = DocumentType.PPTX;
+    else if (ext === "pdf") docType = DocumentType.PDF;
 
     const document = await this.prisma.document.create({
       data: {
         name: file.originalname,
-        type: ext.toUpperCase(),
-        mimeType: file.mimetype,
+        type: docType,
         status: DocumentStatus.READY,
         ownerId: user.id,
         folderId: folderId && folderId !== "all" ? folderId : null,
         versions: {
           create: {
             version: 1,
-            storageKey: `documents/${user.id}/${Date.now()}_${file.originalname}`,
+            objectKey: `documents/${user.id}/${Date.now()}_${file.originalname}`,
             sizeBytes: BigInt(file.size),
-            createdById: user.id,
+            authorId: user.id,
           },
         },
       },
       include: this.publicInclude(user),
     });
 
-    const storageKey = document.versions[0]?.storageKey;
-    if (storageKey) {
+    const objectKey = document.versions[0]?.objectKey;
+    if (objectKey) {
       try {
-        await this.storage.putObject(storageKey, file.buffer, file.mimetype);
+        await this.storage.putObject(objectKey, file.buffer, file.mimetype);
       } catch (err) {
         console.warn("[Storage] PutObject failed:", err);
       }
@@ -303,12 +281,11 @@ export class DocumentsService {
     });
     if (!document) throw new NotFoundException("Document not found");
 
-    const storageKey = document.versions[0]?.storageKey;
-    if (storageKey) {
+    const objectKey = document.versions[0]?.objectKey;
+    if (objectKey) {
       try {
-        const stream = await this.storage.getObjectStream(storageKey);
+        const stream = await this.storage.getObjectStream(objectKey);
         if (stream) {
-          // Convert stream to buffer
           const chunks: Uint8Array[] = [];
           for await (const chunk of stream as AsyncIterable<Uint8Array>) {
             chunks.push(chunk);
@@ -331,7 +308,6 @@ export class DocumentsService {
 
   async handleCallback(id: string, body: Record<string, unknown>) {
     console.log(`[ONLYOFFICE Callback] Document ${id}:`, body);
-    // ONLYOFFICE status 2 = Document is ready for saving
     if (body.status === 2 && typeof body.url === "string") {
       try {
         const response = await fetch(body.url);
@@ -345,10 +321,10 @@ export class DocumentsService {
           });
 
           const nextVersionNumber = (lastVersion?.version ?? 0) + 1;
-          const storageKey = `documents/${id}/v${nextVersionNumber}_${Date.now()}`;
+          const objectKey = `documents/${id}/v${nextVersionNumber}_${Date.now()}`;
 
           await this.storage.putObject(
-            storageKey,
+            objectKey,
             buffer,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
           );
@@ -357,9 +333,9 @@ export class DocumentsService {
             data: {
               documentId: id,
               version: nextVersionNumber,
-              storageKey,
+              objectKey,
               sizeBytes: BigInt(buffer.length),
-              createdById: lastVersion?.createdById || id,
+              authorId: lastVersion?.authorId || id,
             },
           });
 
@@ -377,6 +353,105 @@ export class DocumentsService {
     return { error: 0 };
   }
 
+  async addPermission(
+    id: string,
+    email: string,
+    role: "VIEWER" | "COMMENTER" | "EDITOR",
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureOwnedDocument(id, user);
+
+    const targetUser = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    const permission = await this.prisma.documentPermission.create({
+      data: {
+        documentId: id,
+        email,
+        userId: targetUser?.id,
+        role: role as PermissionRole,
+        grantedById: user.id,
+      },
+    });
+
+    return permission;
+  }
+
+  async removePermission(
+    id: string,
+    permissionId: string,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureOwnedDocument(id, user);
+    await this.prisma.documentPermission.delete({
+      where: { id: permissionId },
+    });
+    return { id: permissionId, status: "removed" };
+  }
+
+  async getVersions(id: string, user: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, OR: this.accessWhere(user) },
+      select: { id: true },
+    });
+    if (!document) throw new NotFoundException("Document not found");
+
+    const versions = await this.prisma.documentVersion.findMany({
+      where: { documentId: id },
+      include: { author: { select: { name: true } } },
+      orderBy: { version: "desc" },
+    });
+
+    return versions.map((v) => ({
+      id: v.id,
+      version: v.version,
+      versionLabel: `v${v.version}.0`,
+      modifiedAt: v.createdAt.toISOString(),
+      author: v.author.name,
+      size: formatBytes(v.sizeBytes),
+    }));
+  }
+
+  async restoreVersion(
+    id: string,
+    versionNumber: number,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureOwnedDocument(id, user);
+    const targetVersion = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id, version: versionNumber },
+    });
+    if (!targetVersion) throw new NotFoundException("Version not found");
+
+    const lastVersion = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id },
+      orderBy: { version: "desc" },
+    });
+
+    const nextVersionNumber = (lastVersion?.version ?? 0) + 1;
+    const newVersion = await this.prisma.documentVersion.create({
+      data: {
+        documentId: id,
+        version: nextVersionNumber,
+        objectKey: targetVersion.objectKey,
+        sizeBytes: targetVersion.sizeBytes,
+        authorId: user.id,
+      },
+    });
+
+    await this.prisma.document.update({
+      where: { id },
+      data: { updatedAt: new Date() },
+    });
+
+    return {
+      version: newVersion.version,
+      status: "restored",
+    };
+  }
+
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.ownerWhere(user) },
@@ -392,7 +467,7 @@ export class DocumentsService {
       versions: {
         orderBy: { version: "desc" as const },
         take: 1,
-        select: { sizeBytes: true },
+        select: { sizeBytes: true, objectKey: true },
       },
       permissions: {
         where: this.permissionWhere(user),
