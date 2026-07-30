@@ -1,23 +1,16 @@
 /**
- * Vercel Serverless Proxy – /api/[...path]
- * Tất cả request đến /api/* sẽ được forward sang backend HTTP.
- * Node.js runtime không bị giới hạn Mixed Content như trình duyệt.
+ * Vercel Serverless Proxy
+ * Route: /api/* → forward sang backend HTTP
  */
 
 const BACKEND = "http://103.190.38.46/api";
 
 export default async function handler(req, res) {
-  const segments = Array.isArray(req.query.path)
-    ? req.query.path
-    : req.query.path
-    ? [req.query.path]
-    : [];
+  // path được truyền qua query string từ vercel.json routes
+  const pathStr = req.query.path || "";
+  const qs = req.query.qs || "";
 
-  const url = new URL(req.url, "http://localhost");
-  url.searchParams.delete("path");
-  const qs = url.search;
-
-  const target = `${BACKEND}/${segments.join("/")}${qs}`;
+  const target = `${BACKEND}/${pathStr}${qs ? `?${qs}` : ""}`;
 
   const forwardHeaders = {};
   for (const key of ["content-type", "authorization", "accept", "accept-language"]) {
