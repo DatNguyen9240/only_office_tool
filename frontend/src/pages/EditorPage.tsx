@@ -59,7 +59,7 @@ export function EditorPage() {
         </Space>
       </header>
       <section className="editor-stage" aria-label="Document editor">
-        <OnlyOfficeEditor />
+        <OnlyOfficeEditor documentId={id} />
       </section>
       <SharePermissionModal open={shareOpen} document={document} onClose={() => setShareOpen(false)} />
       <VersionHistoryDrawer open={versionsOpen} document={document} onClose={() => setVersionsOpen(false)} />
