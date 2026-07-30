@@ -3,7 +3,7 @@
  * Route: /api/* → forward sang backend HTTP
  */
 
-const BACKEND = "http://103.190.38.46/api";
+const BACKEND = "http://103.190.38.46:3000/api";
 
 export default async function handler(req, res) {
   const pathStr = req.query.path || "";
