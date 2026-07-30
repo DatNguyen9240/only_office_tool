@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, Length } from "class-validator";
+import { IsBoolean, IsInt, IsOptional, IsString, Length, Min } from "class-validator";
 
 export class UpdateDocumentDto {
   @IsOptional()
@@ -13,4 +13,9 @@ export class UpdateDocumentDto {
   @IsOptional()
   @IsBoolean()
   starred?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  expectedVersion?: number;
 }

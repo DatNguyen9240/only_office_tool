@@ -4,19 +4,28 @@ import {
   Param,
   Post,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from "@nestjs/common";
-import { DocumentsService } from "./documents.service";
+import { OnlyOfficeService } from "./onlyoffice.service";
+import { OnlyOfficeCallbackDto } from "./dto/onlyoffice-callback.dto";
+import { OnlyOfficeCallbackQueryDto } from "./dto/onlyoffice-callback-query.dto";
 
 @Controller("documents")
 export class OnlyOfficeController {
-  constructor(private readonly documents: DocumentsService) {}
+  constructor(private readonly onlyOfficeService: OnlyOfficeService) {}
 
   @Post(":id/onlyoffice-callback")
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
   callback(
     @Param("id") id: string,
-    @Query("ticket") ticket: string,
-    @Body() body: Record<string, unknown>,
+    @Query() query: OnlyOfficeCallbackQueryDto,
+    @Body() body: OnlyOfficeCallbackDto,
   ) {
-    return this.documents.handleOnlyOfficeCallback(id, ticket, body);
+    return this.onlyOfficeService.handleOnlyOfficeCallback(
+      id,
+      query.ticket,
+      body,
+    );
   }
 }

@@ -4,12 +4,28 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { StorageModule } from "../storage/storage.module";
 import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
+import { DocumentPermissionsService } from "./document-permissions.service";
+import { DocumentVersionsService } from "./document-versions.service";
 import { OnlyOfficeController } from "./onlyoffice.controller";
+import { OnlyOfficeService } from "./onlyoffice.service";
+import { DocumentAuditListener } from "./listeners/document-audit.listener";
 
 @Module({
   imports: [PrismaModule, StorageModule, JwtModule.register({})],
   controllers: [DocumentsController, OnlyOfficeController],
-  providers: [DocumentsService],
-  exports: [DocumentsService],
+  providers: [
+    DocumentsService,
+    DocumentPermissionsService,
+    DocumentVersionsService,
+    OnlyOfficeService,
+    DocumentAuditListener,
+  ],
+  exports: [
+    DocumentsService,
+    DocumentPermissionsService,
+    DocumentVersionsService,
+    OnlyOfficeService,
+    DocumentAuditListener,
+  ],
 })
 export class DocumentsModule {}

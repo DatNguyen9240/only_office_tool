@@ -1,4 +1,4 @@
-import { Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   DeleteObjectsCommand,
@@ -19,6 +19,7 @@ export interface StorageCapacity {
 
 @Injectable()
 export class StorageService {
+  private readonly logger = new Logger(StorageService.name);
   private readonly internalClient: S3Client;
   private readonly publicClient: S3Client;
   private readonly bucket: string;
@@ -33,6 +34,12 @@ export class StorageService {
     const region = this.config.get<string>("S3_REGION", "us-east-1");
     const accessKeyId = this.config.get<string>("S3_ACCESS_KEY");
     const secretAccessKey = this.config.get<string>("S3_SECRET_KEY");
+
+    if (!accessKeyId || !secretAccessKey) {
+      this.logger.warn(
+        "S3_ACCESS_KEY or S3_SECRET_KEY is missing in environment. Storage operations may fail.",
+      );
+    }
 
     this.bucket = this.config.get<string>(
       "S3_BUCKET",

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -18,6 +17,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { AdminService } from "./admin.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { ListAuditQueryDto, ListUsersQueryDto } from "./dto/list-users.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMINISTRATOR)
@@ -26,8 +26,8 @@ export class AdminController {
   constructor(private readonly admin: AdminService) {}
 
   @Get("users")
-  listUsers(@Query("limit") limitParam?: string) {
-    return this.admin.listUsers(this.parseLimit(limitParam));
+  listUsers(@Query() query: ListUsersQueryDto) {
+    return this.admin.listUsers(query.limit ?? 100);
   }
 
   @Post("users")
@@ -56,24 +56,11 @@ export class AdminController {
   }
 
   @Get("audit")
-  listAudit(
-    @Query("limit") limitParam?: string,
-    @Query("action") action?: string,
-    @Query("outcome") outcome?: string,
-  ) {
+  listAudit(@Query() query: ListAuditQueryDto) {
     return this.admin.listAudit(
-      this.parseLimit(limitParam),
-      action,
-      outcome,
+      query.limit ?? 100,
+      query.action,
+      query.outcome,
     );
-  }
-
-  private parseLimit(value?: string) {
-    if (!value) return 100;
-    const parsed = Number(value);
-    if (!Number.isInteger(parsed) || parsed < 1) {
-      throw new BadRequestException("limit must be a positive integer");
-    }
-    return Math.min(parsed, 500);
   }
 }

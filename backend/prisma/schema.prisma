@@ -98,6 +98,7 @@ model Document {
   folderId         String?
   ownerId          String
   starred          Boolean              @default(false)
+  version          Int                  @default(1)
   currentVersionId String?              @unique
   folder           Folder?              @relation(fields: [folderId], references: [id])
   owner            User                 @relation("DocumentOwner", fields: [ownerId], references: [id])

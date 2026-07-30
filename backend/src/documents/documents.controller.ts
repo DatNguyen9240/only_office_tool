@@ -19,6 +19,7 @@ import {
   CreatePermissionDto,
   UpdatePermissionDto,
 } from "./dto/permission.dto";
+import { ListDocumentsQueryDto } from "./dto/list-documents.dto";
 
 @UseGuards(JwtAuthGuard)
 @Controller("documents")
@@ -28,24 +29,14 @@ export class DocumentsController {
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query("scope") scope = "all",
-    @Query("folderId") folderId?: string,
-    @Query("q") search?: string,
-    @Query("limit") limitParam?: string,
+    @Query() query: ListDocumentsQueryDto,
   ) {
-    if (!["all", "shared", "trash"].includes(scope)) {
-      throw new BadRequestException("scope must be all, shared, or trash");
-    }
-    const parsedLimit = Number(limitParam);
-    const limit = Number.isFinite(parsedLimit)
-      ? Math.min(Math.max(Math.trunc(parsedLimit), 1), 100)
-      : 100;
     return this.documents.list(
-      scope as "all" | "shared" | "trash",
+      query.scope ?? "all",
       user,
-      folderId,
-      search,
-      limit,
+      query.folderId,
+      query.q,
+      query.limit,
     );
   }
 
