@@ -6,6 +6,8 @@
 const BACKEND = "http://103.190.38.46/api";
 
 export default async function handler(req, res) {
+  const pathStr = req.query.path || "";
+
   // Thu thập toàn bộ query parameters ngoại trừ "path" để chuyển tiếp lên backend
   const queryParams = { ...req.query };
   delete queryParams.path;
