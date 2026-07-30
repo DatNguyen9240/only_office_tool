@@ -3,7 +3,7 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common";
-import { PermissionRole } from "@prisma/client";
+import { PermissionRole, Prisma } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { DocumentAccessService, AuditAction } from "./document-access.service";
@@ -81,22 +81,30 @@ export class DocumentPermissionsService {
     user: AuthenticatedUser,
   ) {
     const document = await this.ensureOwnedDocument(id, user);
-    const updated = await this.prisma.documentPermission.updateMany({
-      where: { id: permissionId, documentId: id },
-      data: { role: input.role, grantedById: user.id },
-    });
-    if (updated.count !== 1) throw new NotFoundException("Permission not found");
-    const permission = await this.prisma.documentPermission.findUniqueOrThrow({
-      where: { id: permissionId },
-      include: { user: { select: { name: true } } },
-    });
-    this.accessService.recordAuditAsync(
-      user.id,
-      AuditAction.PERMISSION_UPDATED,
-      id,
-      document.name,
-    );
-    return this.toPermissionEntry(permission);
+
+    try {
+      const permission = await this.prisma.documentPermission.update({
+        where: { id: permissionId, documentId: id },
+        data: { role: input.role, grantedById: user.id },
+        include: { user: { select: { name: true } } },
+      });
+
+      this.accessService.recordAuditAsync(
+        user.id,
+        AuditAction.PERMISSION_UPDATED,
+        id,
+        document.name,
+      );
+      return this.toPermissionEntry(permission);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new NotFoundException("Permission not found");
+      }
+      throw error;
+    }
   }
 
   async removePermission(
@@ -132,21 +140,26 @@ export class DocumentPermissionsService {
     role: PermissionRole;
     user: { name: string } | null;
   }) {
-    const email = permission.email ?? "";
-    const name = permission.user?.name ?? email.split("@")[0] ?? email;
+    const email = permission.email?.trim() ?? "";
+    const fallbackName = email.includes("@")
+      ? email.split("@")[0]
+      : email || "Unknown User";
+    const displayName = permission.user?.name?.trim() || fallbackName;
+
+    const initials = displayName
+      .split(/\s+/)
+      .filter((part) => part.length > 0)
+      .map((part) => part.charAt(0))
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+
     return {
       id: permission.id,
-      name,
+      name: displayName,
       email,
       role: this.toPublicPermission(permission.role),
-      initials: name
-        .trim()
-        .split(/\s+/)
-        .filter((part) => part.length > 0)
-        .map((part) => part.charAt(0))
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "US",
+      initials: initials || "US",
     };
   }
 

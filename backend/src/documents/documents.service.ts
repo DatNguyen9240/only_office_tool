@@ -7,32 +7,19 @@ import {
 } from "@nestjs/common";
 import {
   DocumentStatus,
-  PermissionRole,
   Prisma,
 } from "@prisma/client";
-import type {
-  DocumentItem,
-  DocumentStatus as PublicDocumentStatus,
-  DocumentType as PublicDocumentType,
-} from "@share";
+import type { DocumentItem } from "@share";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { DocumentAccessService, AuditAction } from "./document-access.service";
 import { DocumentPermissionsService } from "./document-permissions.service";
-import {
-  DocumentVersionsService,
-  formatBytes,
-} from "./document-versions.service";
+import { DocumentVersionsService } from "./document-versions.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
+import { DocumentMapper } from "./mappers/document.mapper";
 
 type DocumentScope = "all" | "shared" | "trash";
-
-const publicType = (value: string): PublicDocumentType =>
-  value.toLowerCase() as PublicDocumentType;
-
-const publicStatus = (value: string): PublicDocumentStatus =>
-  value.toLowerCase() as PublicDocumentStatus;
 
 @Injectable()
 export class DocumentsService {
@@ -71,12 +58,14 @@ export class DocumentsService {
 
     const documents = await this.prisma.document.findMany({
       where,
-      include: this.publicInclude(user),
+      include: DocumentMapper.publicInclude(this.accessService, user),
       orderBy: { updatedAt: "desc" },
       take: limit,
     });
 
-    return documents.map((document) => this.toPublicItem(document, user.id));
+    return documents.map((document) =>
+      DocumentMapper.toPublicItem(document, user.id, this.permissionsService),
+    );
   }
 
   async getById(
@@ -85,7 +74,7 @@ export class DocumentsService {
   ): Promise<DocumentItem> {
     const document = await this.prisma.document.findFirst({
       where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
-      include: this.publicInclude(user),
+      include: DocumentMapper.publicInclude(this.accessService, user),
     });
 
     if (!document) throw new NotFoundException("Document not found");
@@ -97,7 +86,7 @@ export class DocumentsService {
       document.name,
     );
 
-    return this.toPublicItem(document, user.id);
+    return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
   }
 
   async update(
@@ -132,10 +121,10 @@ export class DocumentsService {
           ...(input.starred === undefined ? {} : { starred: input.starred }),
           version: { increment: 1 },
         },
-        include: this.publicInclude(user),
+        include: DocumentMapper.publicInclude(this.accessService, user),
       });
 
-      return this.toPublicItem(document, user.id);
+      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -194,7 +183,7 @@ export class DocumentsService {
           status: DocumentStatus.READY,
           version: { increment: 1 },
         },
-        include: this.publicInclude(user),
+        include: DocumentMapper.publicInclude(this.accessService, user),
       });
 
       this.accessService.recordAuditAsync(
@@ -203,7 +192,7 @@ export class DocumentsService {
         id,
         ownedDocument.name,
       );
-      return this.toPublicItem(document, user.id);
+      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -250,7 +239,7 @@ export class DocumentsService {
     if (keysToDelete.length > 0) {
       this.storage.deleteObjects(keysToDelete).catch((err) => {
         this.logger.error(
-          `Failed to delete storage objects for permanently deleted document ${id}`,
+          `[STORAGE_CLEANUP_ERROR] Failed to delete storage objects for permanently deleted document ${id}`,
           err,
         );
       });
@@ -266,50 +255,56 @@ export class DocumentsService {
   }
 
   async emptyTrash(user: AuthenticatedUser) {
-    const documents = await this.prisma.document.findMany({
-      where: {
-        deletedAt: { not: null },
-        ownerId: user.id,
-      },
-      select: {
-        id: true,
-        name: true,
-        versions: { select: { objectKey: true } },
-      },
-    });
-
-    if (documents.length === 0) {
-      return { status: "trash_emptied" as const, count: 0 };
-    }
-
-    const keysToDelete = documents.flatMap((document) =>
-      document.versions.map((version) => version.objectKey),
-    );
-
-    const deleted = await this.prisma.document.deleteMany({
-      where: {
-        id: { in: documents.map((document) => document.id) },
-        ownerId: user.id,
-        deletedAt: { not: null },
-      },
-    });
-
-    if (keysToDelete.length > 0) {
-      this.storage.deleteObjects(keysToDelete).catch((err) => {
-        this.logger.warn("Failed to delete storage objects during emptyTrash", err);
+    return this.prisma.$transaction(async (tx) => {
+      const documents = await tx.document.findMany({
+        where: {
+          deletedAt: { not: null },
+          ownerId: user.id,
+        },
+        select: {
+          id: true,
+          name: true,
+          versions: { select: { objectKey: true } },
+        },
       });
-    }
 
-    for (const doc of documents) {
-      this.accessService.recordAuditAsync(
-        user.id,
-        AuditAction.DOCUMENT_PERMANENTLY_DELETED,
-        doc.id,
-        doc.name,
+      if (documents.length === 0) {
+        return { status: "trash_emptied" as const, count: 0 };
+      }
+
+      const docIds = documents.map((doc) => doc.id);
+      const keysToDelete = documents.flatMap((document) =>
+        document.versions.map((version) => version.objectKey),
       );
-    }
 
-    return { status: "trash_emptied" as const, count: deleted.count };
+      const deleted = await tx.document.deleteMany({
+        where: {
+          id: { in: docIds },
+          ownerId: user.id,
+          deletedAt: { not: null },
+        },
+      });
+
+      if (keysToDelete.length > 0) {
+        this.storage.deleteObjects(keysToDelete).catch((err) => {
+          this.logger.error(
+            `[STORAGE_CLEANUP_ERROR] Failed to delete storage objects during emptyTrash for user ${user.id}`,
+            err,
+          );
+        });
+      }
+
+      for (const doc of documents) {
+        this.accessService.recordAuditAsync(
+          user.id,
+          AuditAction.DOCUMENT_PERMANENTLY_DELETED,
+          doc.id,
+          doc.name,
+        );
+      }
+
+      return { status: "trash_emptied" as const, count: deleted.count };
+    });
   }
 
   async toggleStar(
@@ -328,7 +323,7 @@ export class DocumentsService {
           starred: !current.starred,
           version: { increment: 1 },
         },
-        include: this.publicInclude(user),
+        include: DocumentMapper.publicInclude(this.accessService, user),
       });
 
       this.accessService.recordAuditAsync(
@@ -337,7 +332,7 @@ export class DocumentsService {
         id,
         current.name,
       );
-      return this.toPublicItem(document, user.id);
+      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -358,53 +353,5 @@ export class DocumentsService {
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;
-  }
-
-  private publicInclude(user: AuthenticatedUser) {
-    return {
-      owner: { select: { name: true } },
-      folder: { select: { id: true } },
-      versions: {
-        orderBy: { version: "desc" as const },
-        take: 1,
-        select: { sizeBytes: true, objectKey: true },
-      },
-      permissions: {
-        where: this.accessService.permissionWhere(user),
-        take: 1,
-        select: { role: true },
-      },
-      _count: { select: { permissions: true } },
-    } satisfies Prisma.DocumentInclude;
-  }
-
-  private toPublicItem(
-    document: Prisma.DocumentGetPayload<{
-      include: ReturnType<DocumentsService["publicInclude"]>;
-    }>,
-    userId: string,
-  ): DocumentItem {
-    const permission =
-      document.ownerId === userId
-        ? PermissionRole.OWNER
-        : document.permissions[0]?.role;
-    return {
-      id: document.id,
-      name: document.name,
-      type: publicType(document.type),
-      owner: document.owner.name,
-      modifiedAt: document.updatedAt.toISOString(),
-      size: formatBytes(document.versions[0]?.sizeBytes),
-      status: publicStatus(document.status),
-      folderId: document.folder?.id ?? "all",
-      shared: document._count.permissions > 0,
-      ...(document.starred ? { starred: true } : {}),
-      ...(document.deletedAt
-        ? { deletedAt: document.deletedAt.toISOString() }
-        : {}),
-      ...(permission
-        ? { permission: this.permissionsService.toPublicPermission(permission) }
-        : {}),
-    };
   }
 }

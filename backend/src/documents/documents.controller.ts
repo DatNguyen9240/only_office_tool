@@ -13,6 +13,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
+import { ParsePositiveIntPipe } from "../common/pipes/parse-positive-int.pipe";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -115,40 +116,18 @@ export class DocumentsController {
   @Get(":id/versions/:versionNumber/download-url")
   downloadVersion(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Param(
-      "versionNumber",
-      new ParseIntPipe({
-        errorHttpStatusCode: HttpStatus.BAD_REQUEST,
-        exceptionFactory: () =>
-          new BadRequestException("versionNumber must be a positive integer"),
-      }),
-    )
-    versionNumber: number,
+    @Param("versionNumber", ParsePositiveIntPipe) versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    if (versionNumber < 1) {
-      throw new BadRequestException("versionNumber must be a positive integer");
-    }
     return this.versionsService.createVersionDownloadUrl(id, versionNumber, user);
   }
 
   @Post(":id/versions/:versionNumber/restore")
   restoreVersion(
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Param(
-      "versionNumber",
-      new ParseIntPipe({
-        errorHttpStatusCode: HttpStatus.BAD_REQUEST,
-        exceptionFactory: () =>
-          new BadRequestException("versionNumber must be a positive integer"),
-      }),
-    )
-    versionNumber: number,
+    @Param("versionNumber", ParsePositiveIntPipe) versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    if (versionNumber < 1) {
-      throw new BadRequestException("versionNumber must be a positive integer");
-    }
     return this.versionsService.restoreVersion(id, versionNumber, user);
   }
 
