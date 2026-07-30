@@ -23,9 +23,10 @@ PostgreSQL   MinIO        ONLYOFFICE Docs
                 :6379
 ```
 
-PostgreSQL and ONLYOFFICE Docs are installed on the developer machine. MinIO
-and Redis may run in Docker during development. Nginx is optional locally and
-is reserved for a production-like reverse proxy.
+PostgreSQL and ONLYOFFICE Docs are installed on the developer machine. The
+repository Compose stack runs MinIO with a persistent host bind mount and
+initializes the document bucket before starting the API. Redis is reserved for
+the future queue implementation.
 
 ## Service Responsibilities
 

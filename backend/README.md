@@ -43,8 +43,9 @@ running is reported as `down` without preventing the API from starting.
 
 ## Docker deployment
 
-The repository-level Compose file runs only the backend API. The frontend is
-deployed separately by Vercel.
+The repository-level Compose file runs the backend API, MinIO, and a one-shot
+bucket initialization container. The frontend is deployed separately by
+Vercel.
 
 On a Windows server running Docker Desktop, create `backend/.env`. For
 PostgreSQL and ONLYOFFICE installed directly on Windows, use Docker Desktop's
@@ -60,11 +61,13 @@ S3_ENDPOINT=http://host.docker.internal:9000
 S3_PUBLIC_ENDPOINT=https://files.example.com
 S3_REGION=us-east-1
 S3_ACCESS_KEY=minio
-S3_SECRET_KEY=change-me
+S3_SECRET_KEY=use-a-strong-password
 S3_BUCKET=meridian-documents
 S3_FORCE_PATH_STYLE=true
 S3_URL_TTL_SECONDS=900
-MINIO_METRICS_URL=http://host.docker.internal:9000
+MINIO_ROOT_USER=minio
+MINIO_ROOT_PASSWORD=use-the-same-strong-password
+MINIO_METRICS_URL=http://minio:9000
 MINIO_METRICS_TOKEN=
 STORAGE_QUOTA_BYTES=107374182400
 ```
@@ -78,13 +81,18 @@ deployment, metrics can instead be made public by starting MinIO with
 case. When metrics are unavailable, the dashboard explicitly falls back to
 `STORAGE_QUOTA_BYTES`.
 
+The Compose file overrides `S3_ENDPOINT` and `MINIO_METRICS_URL` with the
+private `http://minio:9000` service address. Configure `S3_PUBLIC_ENDPOINT`
+with the HTTPS hostname used by browsers for presigned uploads/downloads.
+
 From the repository root:
 
-```bash
-docker compose build api
-docker compose run --rm api npm run prisma:deploy
-docker compose up -d api
-docker compose ps
+```powershell
+docker.exe compose pull minio minio-init
+docker.exe compose build api
+docker.exe compose run --rm api npm run prisma:deploy
+docker.exe compose up -d
+docker.exe compose ps
 ```
 
 Docker Desktop resolves `host.docker.internal` without an explicit Compose
