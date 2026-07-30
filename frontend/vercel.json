@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "outputDirectory": "dist",
   "functions": {
     "api/proxy.js": {
       "maxDuration": 10
