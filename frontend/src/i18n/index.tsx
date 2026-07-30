@@ -469,6 +469,37 @@ export function I18nProvider({
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
+const errorTranslationsVi: Record<string, string> = {
+  "Email or password is incorrect": "Email hoặc mật khẩu không chính xác.",
+  "password must be longer than or equal to 12 characters": "Mật khẩu phải có ít nhất 12 ký tự.",
+  "password should not be empty": "Mật khẩu không được để trống.",
+  "email should not be empty": "Email không được để trống.",
+  "email must be an email": "Định dạng email không hợp lệ.",
+  "Refresh session is invalid": "Phiên đăng nhập đã hết hạn.",
+  "Refresh token has already been used": "Phiên làm việc đã được sử dụng ở nơi khác.",
+  "Unauthorized": "Không có quyền truy cập.",
+  "Sign in failed": "Đăng nhập thất bại.",
+  "Set VITE_API_URL to connect to the Meridian API.": "Chưa cấu hình địa chỉ VITE_API_URL.",
+  "API URL is not configured": "Chưa cấu hình địa chỉ API.",
+  "Backend unreachable": "Không thể kết nối tới máy chủ Backend.",
+  "Internal Server Error": "Lỗi máy chủ nội bộ.",
+};
+
+export function translateApiError(errorMsg: string, locale: AppLocale): string {
+  if (locale !== "vi") return errorMsg;
+  // Dịch nguyên câu nếu khớp chính xác
+  if (errorTranslationsVi[errorMsg]) return errorTranslationsVi[errorMsg];
+  // Dịch các thông báo lỗi dạng mảng gộp (dấu phẩy phân cách)
+  return errorMsg
+    .split(",")
+    .map((item) => {
+      const trimmed = item.trim();
+      return errorTranslationsVi[trimmed] || trimmed;
+    })
+    .join(", ");
+}
+
 export function useI18n() {
   return useContext(I18nContext);
 }
+

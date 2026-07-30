@@ -20,14 +20,14 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import loginArchive from "@/assets/login-archive.jpg";
 import { PreferenceControls } from "@/components/common/PreferenceControls";
-import { useI18n } from "@/i18n";
+import { translateApiError, useI18n } from "@/i18n";
 import { isApiConfigured } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const { message } = App.useApp();
   const login = useAuthStore((state) => state.login);
   const [submitting, setSubmitting] = useState(false);
@@ -48,7 +48,8 @@ export function LoginPage() {
       const from = (location.state as { from?: { pathname?: string } } | null)?.from;
       navigate(from?.pathname || "/workspace", { replace: true });
     } catch (cause) {
-      const nextError = cause instanceof Error ? cause.message : "Sign in failed";
+      const rawError = cause instanceof Error ? cause.message : "Sign in failed";
+      const nextError = translateApiError(rawError, locale);
       setError(nextError);
       message.error(nextError);
     } finally {
