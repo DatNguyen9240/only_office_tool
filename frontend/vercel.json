@@ -1,6 +1,29 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/proxy.js",
+      "use": "@vercel/node"
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "missing": [
+        {
+          "type": "query",
+          "key": "proxied"
+        }
+      ],
+      "destination": "/api/proxy.js?path=:path*&proxied=true"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
