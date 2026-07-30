@@ -4,6 +4,7 @@ import { PrismaModule } from "../prisma/prisma.module";
 import { StorageModule } from "../storage/storage.module";
 import { DocumentsController } from "./documents.controller";
 import { DocumentsService } from "./documents.service";
+import { DocumentAccessService } from "./document-access.service";
 import { DocumentPermissionsService } from "./document-permissions.service";
 import { DocumentVersionsService } from "./document-versions.service";
 import { OnlyOfficeController } from "./onlyoffice.controller";
@@ -15,6 +16,7 @@ import { DocumentAuditListener } from "./listeners/document-audit.listener";
   controllers: [DocumentsController, OnlyOfficeController],
   providers: [
     DocumentsService,
+    DocumentAccessService,
     DocumentPermissionsService,
     DocumentVersionsService,
     OnlyOfficeService,
@@ -22,6 +24,7 @@ import { DocumentAuditListener } from "./listeners/document-audit.listener";
   ],
   exports: [
     DocumentsService,
+    DocumentAccessService,
     DocumentPermissionsService,
     DocumentVersionsService,
     OnlyOfficeService,

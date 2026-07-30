@@ -2,13 +2,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
 } from "@nestjs/common";
 import { PermissionRole } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { DocumentAccessUtil } from "./document-access.util";
+import { DocumentAccessService, AuditAction } from "./document-access.service";
 import {
   CreatePermissionDto,
   UpdatePermissionDto,
@@ -20,7 +18,7 @@ export class DocumentPermissionsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly audit?: AuditService,
+    private readonly accessService: DocumentAccessService,
   ) {}
 
   async listPermissions(id: string, user: AuthenticatedUser) {
@@ -67,11 +65,9 @@ export class DocumentPermissionsService {
       include: { user: { select: { name: true } } },
     });
 
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    this.accessService.recordAuditAsync(
       user.id,
-      "PERMISSION_GRANTED",
+      AuditAction.PERMISSION_GRANTED,
       id,
       document.name,
     );
@@ -94,11 +90,9 @@ export class DocumentPermissionsService {
       where: { id: permissionId },
       include: { user: { select: { name: true } } },
     });
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    this.accessService.recordAuditAsync(
       user.id,
-      "PERMISSION_UPDATED",
+      AuditAction.PERMISSION_UPDATED,
       id,
       document.name,
     );
@@ -115,11 +109,9 @@ export class DocumentPermissionsService {
       where: { id: permissionId, documentId: id },
     });
     if (removed.count !== 1) throw new NotFoundException("Permission not found");
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    this.accessService.recordAuditAsync(
       user.id,
-      "PERMISSION_REVOKED",
+      AuditAction.PERMISSION_REVOKED,
       id,
       document.name,
     );
@@ -158,7 +150,7 @@ export class DocumentPermissionsService {
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, ...DocumentAccessUtil.ownerWhere(user) },
+      where: { id, ...this.accessService.ownerWhere(user) },
       select: { id: true, name: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");

@@ -2,13 +2,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
 } from "@nestjs/common";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
-import { DocumentAccessUtil } from "./document-access.util";
+import { DocumentAccessService, AuditAction } from "./document-access.service";
 
 export function formatBytes(value: bigint | number | null | undefined): string {
   if (value === null || value === undefined) return "—";
@@ -26,12 +24,12 @@ export class DocumentVersionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    @Optional() private readonly audit?: AuditService,
+    private readonly accessService: DocumentAccessService,
   ) {}
 
   async getVersions(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null, ...DocumentAccessUtil.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
       select: { id: true },
     });
     if (!document) throw new NotFoundException("Document not found");
@@ -91,11 +89,9 @@ export class DocumentVersionsService {
       return created;
     });
 
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    this.accessService.recordAuditAsync(
       user.id,
-      "VERSION_RESTORED",
+      AuditAction.VERSION_RESTORED,
       id,
       document.name,
     );
@@ -111,7 +107,7 @@ export class DocumentVersionsService {
     user: AuthenticatedUser,
   ) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null, ...DocumentAccessUtil.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
       select: { id: true, name: true },
     });
     if (!document) throw new NotFoundException("Document not found");
@@ -126,11 +122,9 @@ export class DocumentVersionsService {
       version: versionNumber,
       ...(await this.storage.createDownloadUrl(version.objectKey)),
     };
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    this.accessService.recordAuditAsync(
       user.id,
-      "VERSION_DOWNLOADED",
+      AuditAction.VERSION_DOWNLOADED,
       id,
       document.name,
     );
@@ -139,7 +133,7 @@ export class DocumentVersionsService {
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, ...DocumentAccessUtil.ownerWhere(user) },
+      where: { id, ...this.accessService.ownerWhere(user) },
       select: { id: true, name: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");

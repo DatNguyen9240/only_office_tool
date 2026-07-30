@@ -4,10 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  Optional,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { JwtService } from "@nestjs/jwt";
 import {
   DocumentStatus,
   PermissionRole,
@@ -19,19 +16,15 @@ import type {
   DocumentType as PublicDocumentType,
 } from "@share";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
-import { DocumentAccessUtil } from "./document-access.util";
+import { DocumentAccessService, AuditAction } from "./document-access.service";
 import { DocumentPermissionsService } from "./document-permissions.service";
 import {
   DocumentVersionsService,
   formatBytes,
 } from "./document-versions.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
-import { CreatePermissionDto, UpdatePermissionDto } from "./dto/permission.dto";
-import { OnlyOfficeCallbackDto } from "./dto/onlyoffice-callback.dto";
-import { OnlyOfficeService } from "./onlyoffice.service";
 
 type DocumentScope = "all" | "shared" | "trash";
 
@@ -45,30 +38,13 @@ const publicStatus = (value: string): PublicDocumentStatus =>
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
 
-  private readonly permissionsService: DocumentPermissionsService;
-  private readonly versionsService: DocumentVersionsService;
-  private readonly onlyOfficeService: OnlyOfficeService;
-
   constructor(
     private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
-    private readonly config: ConfigService,
     private readonly storage: StorageService,
-    @Optional() permissionsService?: DocumentPermissionsService,
-    @Optional() versionsService?: DocumentVersionsService,
-    @Optional() onlyOfficeService?: OnlyOfficeService,
-    @Optional() private readonly audit?: AuditService,
-  ) {
-    this.permissionsService =
-      permissionsService ??
-      new DocumentPermissionsService(this.prisma, this.audit);
-    this.versionsService =
-      versionsService ??
-      new DocumentVersionsService(this.prisma, this.storage, this.audit);
-    this.onlyOfficeService =
-      onlyOfficeService ??
-      new OnlyOfficeService(this.prisma, this.jwt, this.config, this.storage);
-  }
+    private readonly accessService: DocumentAccessService,
+    private readonly permissionsService: DocumentPermissionsService,
+    private readonly versionsService: DocumentVersionsService,
+  ) {}
 
   async list(
     scope: DocumentScope,
@@ -88,9 +64,9 @@ export class DocumentsService {
       ...(scope === "shared"
         ? {
             ownerId: { not: user.id },
-            permissions: { some: DocumentAccessUtil.permissionWhere(user) },
+            permissions: { some: this.accessService.permissionWhere(user) },
           }
-        : DocumentAccessUtil.accessWhere(user)),
+        : this.accessService.accessWhere(user)),
     };
 
     const documents = await this.prisma.document.findMany({
@@ -108,19 +84,19 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null, ...DocumentAccessUtil.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
       include: this.publicInclude(user),
     });
 
     if (!document) throw new NotFoundException("Document not found");
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+
+    this.accessService.recordAuditAsync(
       user.id,
-      "DOCUMENT_VIEWED",
+      AuditAction.DOCUMENT_VIEWED,
       id,
       document.name,
     );
+
     return this.toPublicItem(document, user.id);
   }
 
@@ -139,22 +115,16 @@ export class DocumentsService {
       if (!folder) throw new NotFoundException("Destination folder not found");
     }
 
-    if (
-      input.expectedVersion !== undefined &&
-      ownedDocument.version !== input.expectedVersion
-    ) {
-      throw new ConflictException(
-        `Document version mismatch. Current: ${ownedDocument.version}, Expected: ${input.expectedVersion}`,
-      );
-    }
+    const targetVersion =
+      input.expectedVersion !== undefined
+        ? input.expectedVersion
+        : ownedDocument.version;
 
     try {
       const document = await this.prisma.document.update({
         where: {
           id,
-          ...(input.expectedVersion !== undefined
-            ? { version: input.expectedVersion }
-            : {}),
+          version: targetVersion,
         },
         data: {
           ...(input.name === undefined ? {} : { name: input.name }),
@@ -184,19 +154,30 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ): Promise<{ id: string; status: "deleted" }> {
     const document = await this.ensureOwnedDocument(id, user);
-    await this.prisma.document.update({
-      where: { id },
-      data: {
-        deletedAt: new Date(),
-        status: DocumentStatus.DELETED,
-        version: { increment: 1 },
-      },
-    });
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+    try {
+      await this.prisma.document.update({
+        where: { id, version: document.version },
+        data: {
+          deletedAt: new Date(),
+          status: DocumentStatus.DELETED,
+          version: { increment: 1 },
+        },
+      });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new ConflictException(
+          "Document delete conflict detected. The document was modified by another request.",
+        );
+      }
+      throw error;
+    }
+
+    this.accessService.recordAuditAsync(
       user.id,
-      "DOCUMENT_DELETED",
+      AuditAction.DOCUMENT_DELETED,
       id,
       document.name,
     );
@@ -205,24 +186,35 @@ export class DocumentsService {
 
   async restore(id: string, user: AuthenticatedUser): Promise<DocumentItem> {
     const ownedDocument = await this.ensureOwnedDocument(id, user);
-    const document = await this.prisma.document.update({
-      where: { id },
-      data: {
-        deletedAt: null,
-        status: DocumentStatus.READY,
-        version: { increment: 1 },
-      },
-      include: this.publicInclude(user),
-    });
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
-      user.id,
-      "DOCUMENT_RESTORED",
-      id,
-      ownedDocument.name,
-    );
-    return this.toPublicItem(document, user.id);
+    try {
+      const document = await this.prisma.document.update({
+        where: { id, version: ownedDocument.version },
+        data: {
+          deletedAt: null,
+          status: DocumentStatus.READY,
+          version: { increment: 1 },
+        },
+        include: this.publicInclude(user),
+      });
+
+      this.accessService.recordAuditAsync(
+        user.id,
+        AuditAction.DOCUMENT_RESTORED,
+        id,
+        ownedDocument.name,
+      );
+      return this.toPublicItem(document, user.id);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new ConflictException(
+          "Document restore conflict detected. The document was modified by another request.",
+        );
+      }
+      throw error;
+    }
   }
 
   async permanentDelete(id: string, user: AuthenticatedUser) {
@@ -230,7 +222,7 @@ export class DocumentsService {
       where: {
         id,
         deletedAt: { not: null },
-        ...DocumentAccessUtil.ownerWhere(user),
+        ...this.accessService.ownerWhere(user),
       },
       select: {
         id: true,
@@ -240,20 +232,38 @@ export class DocumentsService {
     });
     if (!document) throw new NotFoundException("Trashed document not found");
     const keysToDelete = document.versions.map((version) => version.objectKey);
-    await this.prisma.document.delete({ where: { id } });
+
     if (keysToDelete.length > 0) {
-      this.storage.deleteObjects(keysToDelete).catch((err) => {
-        this.logger.warn(
-          `Failed to delete storage objects for document ${id}`,
+      try {
+        await this.storage.deleteObjects(keysToDelete);
+      } catch (err) {
+        this.logger.error(
+          `Failed to delete storage objects for document ${id}, aborting DB deletion`,
           err,
         );
-      });
+        throw new BadRequestException(
+          "Failed to delete document storage files. Permanent deletion aborted.",
+        );
+      }
     }
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
+
+    try {
+      await this.prisma.document.delete({ where: { id } });
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new ConflictException(
+          "Document permanent deletion conflict detected. The document was deleted or modified by another request.",
+        );
+      }
+      throw error;
+    }
+
+    this.accessService.recordAuditAsync(
       user.id,
-      "DOCUMENT_PERMANENTLY_DELETED",
+      AuditAction.DOCUMENT_PERMANENTLY_DELETED,
       id,
       document.name,
     );
@@ -273,6 +283,10 @@ export class DocumentsService {
       },
     });
 
+    if (documents.length === 0) {
+      return { status: "trash_emptied" as const, count: 0 };
+    }
+
     const keysToDelete = documents.flatMap((document) =>
       document.versions.map((version) => version.objectKey),
     );
@@ -291,21 +305,13 @@ export class DocumentsService {
       });
     }
 
-    if (documents.length > 0) {
-      Promise.allSettled(
-        documents.map((doc) =>
-          DocumentAccessUtil.recordAudit(
-            this.audit,
-            this.logger,
-            user.id,
-            "DOCUMENT_PERMANENTLY_DELETED",
-            doc.id,
-            doc.name,
-          ),
-        ),
-      ).catch((err) => {
-        this.logger.warn(`Failed to process audit logs for emptyTrash`, err);
-      });
+    for (const doc of documents) {
+      this.accessService.recordAuditAsync(
+        user.id,
+        AuditAction.DOCUMENT_PERMANENTLY_DELETED,
+        doc.id,
+        doc.name,
+      );
     }
 
     return { status: "trash_emptied" as const, count: deleted.count };
@@ -316,86 +322,47 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
     const current = await this.prisma.document.findFirst({
-      where: { id, ...DocumentAccessUtil.ownerWhere(user) },
-      select: { starred: true, name: true },
+      where: { id, ...this.accessService.ownerWhere(user) },
+      select: { starred: true, name: true, version: true },
     });
     if (!current) throw new NotFoundException("Document not found");
 
-    const document = await this.prisma.document.update({
-      where: { id },
-      data: {
-        starred: !current.starred,
-        version: { increment: 1 },
-      },
-      include: this.publicInclude(user),
-    });
+    try {
+      const document = await this.prisma.document.update({
+        where: {
+          id,
+          version: current.version,
+        },
+        data: {
+          starred: !current.starred,
+          version: { increment: 1 },
+        },
+        include: this.publicInclude(user),
+      });
 
-    DocumentAccessUtil.recordAudit(
-      this.audit,
-      this.logger,
-      user.id,
-      document.starred ? "DOCUMENT_STARRED" : "DOCUMENT_UNSTARRED",
-      id,
-      current.name,
-    );
-    return this.toPublicItem(document, user.id);
-  }
-
-  // Delegated OnlyOffice Methods
-  getEditorConfig(id: string, user: AuthenticatedUser) {
-    return this.onlyOfficeService.getEditorConfig(id, user);
-  }
-
-  handleOnlyOfficeCallback(
-    id: string,
-    ticket: string,
-    body: OnlyOfficeCallbackDto,
-  ) {
-    return this.onlyOfficeService.handleOnlyOfficeCallback(id, ticket, body);
-  }
-
-  // Delegated permissions methods
-  addPermission(id: string, input: CreatePermissionDto, user: AuthenticatedUser) {
-    return this.permissionsService.addPermission(id, input, user);
-  }
-
-  listPermissions(id: string, user: AuthenticatedUser) {
-    return this.permissionsService.listPermissions(id, user);
-  }
-
-  updatePermission(
-    id: string,
-    permissionId: string,
-    input: UpdatePermissionDto,
-    user: AuthenticatedUser,
-  ) {
-    return this.permissionsService.updatePermission(id, permissionId, input, user);
-  }
-
-  removePermission(id: string, permissionId: string, user: AuthenticatedUser) {
-    return this.permissionsService.removePermission(id, permissionId, user);
-  }
-
-  // Delegated versions methods
-  getVersions(id: string, user: AuthenticatedUser) {
-    return this.versionsService.getVersions(id, user);
-  }
-
-  restoreVersion(id: string, versionNumber: number, user: AuthenticatedUser) {
-    return this.versionsService.restoreVersion(id, versionNumber, user);
-  }
-
-  createVersionDownloadUrl(
-    id: string,
-    versionNumber: number,
-    user: AuthenticatedUser,
-  ) {
-    return this.versionsService.createVersionDownloadUrl(id, versionNumber, user);
+      this.accessService.recordAuditAsync(
+        user.id,
+        document.starred ? AuditAction.DOCUMENT_STARRED : AuditAction.DOCUMENT_UNSTARRED,
+        id,
+        current.name,
+      );
+      return this.toPublicItem(document, user.id);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2025"
+      ) {
+        throw new ConflictException(
+          "Document star status update conflict. The document was modified by another request.",
+        );
+      }
+      throw error;
+    }
   }
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, ...DocumentAccessUtil.ownerWhere(user) },
+      where: { id, ...this.accessService.ownerWhere(user) },
       select: { id: true, name: true, ownerId: true, version: true },
     });
     if (!document) throw new NotFoundException("Document not found");
@@ -412,7 +379,7 @@ export class DocumentsService {
         select: { sizeBytes: true, objectKey: true },
       },
       permissions: {
-        where: DocumentAccessUtil.permissionWhere(user),
+        where: this.accessService.permissionWhere(user),
         take: 1,
         select: { role: true },
       },

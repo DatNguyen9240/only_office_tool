@@ -16,7 +16,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { OnlyOfficeCallbackDto } from "./dto/onlyoffice-callback.dto";
 import { DOCUMENT_MIME_TYPES } from "../common/constants/mime-types.constant";
-import { DocumentAccessUtil } from "./document-access.util";
+import { DocumentAccessService } from "./document-access.service";
 import { validateFileMagicBytes } from "../common/utils/file-signature.util";
 import { DocumentAuditListener } from "./listeners/document-audit.listener";
 import { DocumentAuditEvent } from "./events/document-audit.event";
@@ -37,6 +37,7 @@ export class OnlyOfficeService implements OnModuleInit {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    private readonly accessService: DocumentAccessService,
     @Optional() private readonly auditListener?: DocumentAuditListener,
   ) {}
 
@@ -74,10 +75,10 @@ export class OnlyOfficeService implements OnModuleInit {
 
   async getEditorConfig(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, deletedAt: null, ...DocumentAccessUtil.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
       include: {
         permissions: {
-          where: DocumentAccessUtil.permissionWhere(user),
+          where: this.accessService.permissionWhere(user),
           take: 1,
           select: { role: true },
         },
