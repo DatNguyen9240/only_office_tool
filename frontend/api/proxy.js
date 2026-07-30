@@ -41,7 +41,11 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("[proxy] fetch error:", err);
-    return res.status(502).json({ message: "Backend unreachable" });
+    return res.status(502).json({
+      message: "Backend unreachable",
+      error: err.message,
+      code: err.code || err.cause?.code,
+    });
   }
 
   res.status(upstream.status);
