@@ -3,9 +3,15 @@
  * Route: /api/* → forward sang backend HTTP
  */
 
-const BACKEND = "http://103.190.38.46:3000/api";
+const BACKEND = (process.env.BACKEND_URL || "").replace(/\/$/, "");
 
 export default async function handler(req, res) {
+  if (!BACKEND) {
+    return res.status(500).json({
+      message: "BACKEND_URL environment variable is not configured on Vercel Dashboard",
+    });
+  }
+
   const pathStr = req.query.path || "";
 
   // Thu thập toàn bộ query parameters ngoại trừ "path" để chuyển tiếp lên backend
