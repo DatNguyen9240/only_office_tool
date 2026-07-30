@@ -14,7 +14,7 @@
           "key": "proxied"
         }
       ],
-      "destination": "/api/proxy.js?path=:path*&proxied=true"
+      "destination": "/api/proxy?path=:path*&proxied=true"
     },
     {
       "source": "/((?!api/).*)",
