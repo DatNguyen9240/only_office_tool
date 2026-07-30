@@ -13,20 +13,22 @@
       "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/:path*",
-      "missing": [
-        {
-          "type": "query",
-          "key": "proxied"
-        }
-      ],
-      "destination": "/api/proxy.js?path=:path*&proxied=true"
+      "src": "/api/proxy",
+      "dest": "/api/proxy.js"
     },
     {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+      "src": "/api/(.*)",
+      "dest": "/api/proxy.js?path=$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
