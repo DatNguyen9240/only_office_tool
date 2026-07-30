@@ -64,7 +64,7 @@ export class DocumentsService {
     });
 
     return documents.map((document) =>
-      DocumentMapper.toPublicItem(document, user.id, this.permissionsService),
+      DocumentMapper.toPublicItem(document, user.id),
     );
   }
 
@@ -86,7 +86,7 @@ export class DocumentsService {
       document.name,
     );
 
-    return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
+    return DocumentMapper.toPublicItem(document, user.id);
   }
 
   async update(
@@ -124,7 +124,7 @@ export class DocumentsService {
         include: DocumentMapper.publicInclude(this.accessService, user),
       });
 
-      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
+      return DocumentMapper.toPublicItem(document, user.id);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -192,7 +192,7 @@ export class DocumentsService {
         id,
         ownedDocument.name,
       );
-      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
+      return DocumentMapper.toPublicItem(document, user.id);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -237,12 +237,14 @@ export class DocumentsService {
     }
 
     if (keysToDelete.length > 0) {
-      this.storage.deleteObjects(keysToDelete).catch((err) => {
+      try {
+        await this.storage.deleteObjects(keysToDelete);
+      } catch (err) {
         this.logger.error(
           `[STORAGE_CLEANUP_ERROR] Failed to delete storage objects for permanently deleted document ${id}`,
-          err,
+          err instanceof Error ? err.stack : String(err),
         );
-      });
+      }
     }
 
     this.accessService.recordAuditAsync(
@@ -259,7 +261,7 @@ export class DocumentsService {
       const documents = await tx.document.findMany({
         where: {
           deletedAt: { not: null },
-          ownerId: user.id,
+          ...this.accessService.ownerWhere(user),
         },
         select: {
           id: true,
@@ -280,18 +282,20 @@ export class DocumentsService {
       const deleted = await tx.document.deleteMany({
         where: {
           id: { in: docIds },
-          ownerId: user.id,
           deletedAt: { not: null },
+          ...this.accessService.ownerWhere(user),
         },
       });
 
       if (keysToDelete.length > 0) {
-        this.storage.deleteObjects(keysToDelete).catch((err) => {
+        try {
+          await this.storage.deleteObjects(keysToDelete);
+        } catch (err) {
           this.logger.error(
             `[STORAGE_CLEANUP_ERROR] Failed to delete storage objects during emptyTrash for user ${user.id}`,
-            err,
+            err instanceof Error ? err.stack : String(err),
           );
-        });
+        }
       }
 
       for (const doc of documents) {
@@ -332,7 +336,7 @@ export class DocumentsService {
         id,
         current.name,
       );
-      return DocumentMapper.toPublicItem(document, user.id, this.permissionsService);
+      return DocumentMapper.toPublicItem(document, user.id);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

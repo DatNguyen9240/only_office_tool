@@ -6,7 +6,6 @@ import type {
 } from "@share";
 import { formatBytes } from "../document-versions.service";
 import { DocumentAccessService } from "../document-access.service";
-import { DocumentPermissionsService } from "../document-permissions.service";
 import type { AuthenticatedUser } from "../../auth/auth.types";
 
 const publicType = (value: string): PublicDocumentType =>
@@ -16,6 +15,14 @@ const publicStatus = (value: string): PublicDocumentStatus =>
   value.toLowerCase() as PublicDocumentStatus;
 
 export class DocumentMapper {
+  static formatPermissionRole(role: PermissionRole): "Viewer" | "Commenter" | "Editor" | "Owner" {
+    return (role.charAt(0) + role.slice(1).toLowerCase()) as
+      | "Viewer"
+      | "Commenter"
+      | "Editor"
+      | "Owner";
+  }
+
   static publicInclude(
     accessService: DocumentAccessService,
     user: AuthenticatedUser,
@@ -42,7 +49,6 @@ export class DocumentMapper {
       include: ReturnType<typeof DocumentMapper.publicInclude>;
     }>,
     userId: string,
-    permissionsService: DocumentPermissionsService,
   ): DocumentItem {
     const permission =
       document.ownerId === userId
@@ -64,8 +70,9 @@ export class DocumentMapper {
         ? { deletedAt: document.deletedAt.toISOString() }
         : {}),
       ...(permission
-        ? { permission: permissionsService.toPublicPermission(permission) }
+        ? { permission: DocumentMapper.formatPermissionRole(permission) }
         : {}),
     };
   }
 }
+

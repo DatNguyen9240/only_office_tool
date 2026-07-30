@@ -12,6 +12,7 @@ import {
   Post,
   Query,
   UseGuards,
+  ValidationPipe,
 } from "@nestjs/common";
 import { ParsePositiveIntPipe } from "../common/pipes/parse-positive-int.pipe";
 import type { AuthenticatedUser } from "../auth/auth.types";
@@ -42,7 +43,7 @@ export class DocumentsController {
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
-    @Query() query: ListDocumentsQueryDto,
+    @Query(new ValidationPipe({ transform: true, whitelist: true })) query: ListDocumentsQueryDto,
   ) {
     return this.documents.list(
       query.scope ?? "all",
