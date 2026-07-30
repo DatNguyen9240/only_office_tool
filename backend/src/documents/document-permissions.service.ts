@@ -53,12 +53,12 @@ export class DocumentPermissionsService {
       create: {
         documentId: id,
         email: input.email,
-        userId: targetUser?.id,
+        userId: targetUser?.id ?? null,
         role: input.role,
         grantedById: user.id,
       },
       update: {
-        userId: targetUser?.id,
+        ...(targetUser?.id ? { userId: targetUser.id } : {}),
         role: input.role,
         grantedById: user.id,
       },
@@ -140,11 +140,13 @@ export class DocumentPermissionsService {
       email,
       role: this.toPublicPermission(permission.role),
       initials: name
+        .trim()
         .split(/\s+/)
-        .map((part) => part[0])
+        .filter((part) => part.length > 0)
+        .map((part) => part.charAt(0))
         .join("")
         .slice(0, 2)
-        .toUpperCase(),
+        .toUpperCase() || "US",
     };
   }
 

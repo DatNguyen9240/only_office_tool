@@ -10,9 +10,9 @@ export const CurrentUser = createParamDecorator(
     const request = context.switchToHttp().getRequest<{
       user?: AuthenticatedUser;
     }>();
-    if (!request.user) {
+    if (!request.user || !request.user.id) {
       throw new UnauthorizedException(
-        "User context is missing or unauthenticated",
+        "User context is missing or invalid",
       );
     }
     return request.user;

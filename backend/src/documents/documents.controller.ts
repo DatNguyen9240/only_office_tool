@@ -11,7 +11,6 @@ import {
   Patch,
   Post,
   Query,
-  UnauthorizedException,
   UseGuards,
 } from "@nestjs/common";
 import type { AuthenticatedUser } from "../auth/auth.types";
@@ -39,18 +38,11 @@ export class DocumentsController {
     private readonly onlyOfficeService: OnlyOfficeService,
   ) {}
 
-  private validateUser(user: AuthenticatedUser): void {
-    if (!user || !user.id) {
-      throw new UnauthorizedException("User context is missing or invalid");
-    }
-  }
-
   @Get()
   list(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ListDocumentsQueryDto,
   ) {
-    this.validateUser(user);
     return this.documents.list(
       query.scope ?? "all",
       user,
@@ -65,7 +57,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.getById(id, user);
   }
 
@@ -74,7 +65,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.onlyOfficeService.getEditorConfig(id, user);
   }
 
@@ -83,7 +73,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.permissionsService.listPermissions(id, user);
   }
 
@@ -93,7 +82,6 @@ export class DocumentsController {
     @Body() input: CreatePermissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.permissionsService.addPermission(id, input, user);
   }
 
@@ -104,7 +92,6 @@ export class DocumentsController {
     @Body() input: UpdatePermissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.permissionsService.updatePermission(id, permissionId, input, user);
   }
 
@@ -114,7 +101,6 @@ export class DocumentsController {
     @Param("permissionId", new ParseUUIDPipe({ version: "4" })) permissionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.permissionsService.removePermission(id, permissionId, user);
   }
 
@@ -123,7 +109,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.versionsService.getVersions(id, user);
   }
 
@@ -141,7 +126,6 @@ export class DocumentsController {
     versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     if (versionNumber < 1) {
       throw new BadRequestException("versionNumber must be a positive integer");
     }
@@ -162,7 +146,6 @@ export class DocumentsController {
     versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     if (versionNumber < 1) {
       throw new BadRequestException("versionNumber must be a positive integer");
     }
@@ -175,7 +158,6 @@ export class DocumentsController {
     @Body() input: UpdateDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.update(id, input, user);
   }
 
@@ -184,7 +166,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.softDelete(id, user);
   }
 
@@ -193,7 +174,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.permanentDelete(id, user);
   }
 
@@ -202,7 +182,6 @@ export class DocumentsController {
     @Query() _query: EmptyTrashQueryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.emptyTrash(user);
   }
 
@@ -211,7 +190,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.restore(id, user);
   }
 
@@ -220,7 +198,6 @@ export class DocumentsController {
     @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    this.validateUser(user);
     return this.documents.toggleStar(id, user);
   }
 }

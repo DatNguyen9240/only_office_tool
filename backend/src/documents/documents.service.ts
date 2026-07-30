@@ -233,20 +233,6 @@ export class DocumentsService {
     if (!document) throw new NotFoundException("Trashed document not found");
     const keysToDelete = document.versions.map((version) => version.objectKey);
 
-    if (keysToDelete.length > 0) {
-      try {
-        await this.storage.deleteObjects(keysToDelete);
-      } catch (err) {
-        this.logger.error(
-          `Failed to delete storage objects for document ${id}, aborting DB deletion`,
-          err,
-        );
-        throw new BadRequestException(
-          "Failed to delete document storage files. Permanent deletion aborted.",
-        );
-      }
-    }
-
     try {
       await this.prisma.document.delete({ where: { id } });
     } catch (error) {
@@ -259,6 +245,15 @@ export class DocumentsService {
         );
       }
       throw error;
+    }
+
+    if (keysToDelete.length > 0) {
+      this.storage.deleteObjects(keysToDelete).catch((err) => {
+        this.logger.error(
+          `Failed to delete storage objects for permanently deleted document ${id}`,
+          err,
+        );
+      });
     }
 
     this.accessService.recordAuditAsync(
@@ -321,11 +316,7 @@ export class DocumentsService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
-    const current = await this.prisma.document.findFirst({
-      where: { id, ...this.accessService.ownerWhere(user) },
-      select: { starred: true, name: true, version: true },
-    });
-    if (!current) throw new NotFoundException("Document not found");
+    const current = await this.ensureOwnedDocument(id, user);
 
     try {
       const document = await this.prisma.document.update({
@@ -363,7 +354,7 @@ export class DocumentsService {
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.accessService.ownerWhere(user) },
-      select: { id: true, name: true, ownerId: true, version: true },
+      select: { id: true, name: true, ownerId: true, version: true, starred: true },
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;
