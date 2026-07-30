@@ -47,20 +47,22 @@ export interface ActivityItem {
   actor: string;
   action: string;
   resource: string;
-  at: string;
+  timestamp: string;
+  outcome: string;
 }
 
-export type UserRole = "Employee" | "Manager" | "Administrator";
-export type UserStatus = "Active" | "Invited" | "Suspended";
+export type UserRole = "EMPLOYEE" | "MANAGER" | "ADMINISTRATOR";
+export type UserStatus = "ACTIVE" | "INVITED" | "SUSPENDED";
 
 export interface UserRecord {
   id: string;
   name: string;
   email: string;
-  department: string;
+  department: string | null;
   role: UserRole;
   status: UserStatus;
-  lastActive: string;
+  lastActiveAt: string | null;
+  createdAt: string;
 }
 
 export type AuthRole = "EMPLOYEE" | "MANAGER" | "ADMINISTRATOR";
@@ -84,11 +86,30 @@ export interface AuditRecord {
   id: string;
   timestamp: string;
   actor: string;
+  actorEmail: string | null;
   action: string;
   resource: string;
-  outcome: "Success" | "Denied";
-  ip: string;
-  device: string;
+  outcome: "SUCCESS" | "DENIED" | "FAILED";
+  ip: string | null;
+  device: string | null;
+}
+
+export interface DashboardResponse {
+  metrics: {
+    documents: number;
+    folders: number;
+    sharedWithMe: number;
+    inReview: number;
+    versions: number;
+  };
+  storage: {
+    usedBytes: number;
+    quotaBytes: number;
+    documentsBytes: number;
+    versionsBytes: number;
+    percent: number;
+  };
+  activities: ActivityItem[];
 }
 
 export type DependencyStatus = "up" | "down" | "not_configured";

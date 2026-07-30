@@ -316,6 +316,9 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             onOpen={() => selectedDocument && openDocument(selectedDocument)}
             onShare={() => setShareDocument(selectedDocument)}
             onVersions={() => setVersionDocument(selectedDocument)}
+            onDownload={() =>
+              selectedDocument && void downloadDocument(selectedDocument)
+            }
             onClose={() => setPreviewOpen(false)}
           />
         )}
@@ -341,6 +344,9 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           onOpen={() => selectedDocument && openDocument(selectedDocument)}
           onShare={() => setShareDocument(selectedDocument)}
           onVersions={() => setVersionDocument(selectedDocument)}
+          onDownload={() =>
+            selectedDocument && void downloadDocument(selectedDocument)
+          }
         />
       </Drawer>
       <Modal

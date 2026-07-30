@@ -15,6 +15,7 @@ interface DocumentPreviewProps {
   onOpen?: () => void;
   onShare?: () => void;
   onVersions?: () => void;
+  onDownload?: () => void;
   onClose?: () => void;
 }
 
@@ -23,6 +24,7 @@ export function DocumentPreview({
   onOpen,
   onShare,
   onVersions,
+  onDownload,
   onClose,
 }: DocumentPreviewProps) {
   if (!document) {
@@ -52,7 +54,11 @@ export function DocumentPreview({
         <Typography.Text type="secondary">
           {fileTypeLabels[document.type]} · {document.size}
         </Typography.Text>
-        <Button icon={<ExpandOutlined />} className="preview-expand">
+        <Button
+          icon={<ExpandOutlined />}
+          className="preview-expand"
+          onClick={onOpen}
+        >
           Full preview
         </Button>
       </div>
@@ -63,7 +69,11 @@ export function DocumentPreview({
         <Button icon={<ShareAltOutlined />} onClick={onShare}>
           Share
         </Button>
-        <Button icon={<DownloadOutlined />} aria-label="Download document" />
+        <Button
+          icon={<DownloadOutlined />}
+          aria-label="Download document"
+          onClick={onDownload}
+        />
       </div>
       <Descriptions column={1} size="small" className="preview-details">
         <Descriptions.Item label="Owner">{document.owner}</Descriptions.Item>

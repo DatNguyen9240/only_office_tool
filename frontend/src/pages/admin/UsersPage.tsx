@@ -1,7 +1,6 @@
 import {
   EditOutlined,
   LockOutlined,
-  MailOutlined,
   MoreOutlined,
   PlusOutlined,
   TeamOutlined,
@@ -16,28 +15,74 @@ import {
   ProTable,
   type ProColumns,
 } from "@ant-design/pro-components";
-import { App, Avatar, Button, Dropdown, Space, Statistic, Tag, Typography } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import {
+  App,
+  Avatar,
+  Button,
+  Dropdown,
+  Space,
+  Statistic,
+  Tag,
+  Typography,
+} from "antd";
 import { useState } from "react";
-import { users as sampleUsers } from "@/data/sampleData";
-import type { UserRecord } from "@share";
+import type { UserRecord, UserRole, UserStatus } from "@share";
+import { apiRequest } from "@/lib/api";
 
-const roleColors = {
-  Employee: "default",
-  Manager: "blue",
-  Administrator: "purple",
+const roleLabels: Record<UserRole, string> = {
+  EMPLOYEE: "Employee",
+  MANAGER: "Manager",
+  ADMINISTRATOR: "Administrator",
 };
-
-const statusColors = {
-  Active: "green",
-  Invited: "gold",
-  Suspended: "red",
+const roleColors: Record<UserRole, string> = {
+  EMPLOYEE: "default",
+  MANAGER: "blue",
+  ADMINISTRATOR: "purple",
 };
+const statusLabels: Record<UserStatus, string> = {
+  ACTIVE: "Active",
+  INVITED: "Invited",
+  SUSPENDED: "Suspended",
+};
+const statusColors: Record<UserStatus, string> = {
+  ACTIVE: "green",
+  INVITED: "gold",
+  SUSPENDED: "red",
+};
+const roleOptions = Object.entries(roleLabels).map(([value, label]) => ({
+  value,
+  label,
+}));
+const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 export function UsersPage() {
-  const { message } = App.useApp();
-  const [users, setUsers] = useState(sampleUsers);
+  const { message, modal } = App.useApp();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord>();
+  const {
+    data: users = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: ({ signal }) =>
+      apiRequest<UserRecord[]>("/admin/users?limit=500", { signal }),
+  });
+
+  const updateUser = async (
+    user: UserRecord,
+    changes: Record<string, unknown>,
+  ) => {
+    await apiRequest<UserRecord>(`/admin/users/${user.id}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
+    await refetch();
+  };
 
   const columns: ProColumns<UserRecord>[] = [
     {
@@ -45,10 +90,12 @@ export function UsersPage() {
       dataIndex: "name",
       render: (_, record) => (
         <Space size={12}>
-          <Avatar>{record.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}</Avatar>
+          <Avatar>{initials(record.name)}</Avatar>
           <span className="user-cell">
             <Typography.Text strong>{record.name}</Typography.Text>
-            <Typography.Text type="secondary">{record.email}</Typography.Text>
+            <Typography.Text type="secondary">
+              {record.email}
+            </Typography.Text>
           </span>
         </Space>
       ),
@@ -56,33 +103,34 @@ export function UsersPage() {
     {
       title: "Department",
       dataIndex: "department",
-      valueType: "select",
-      fieldProps: {
-        options: ["Operations", "Finance", "Executive office", "Information security", "Legal", "People operations"].map((value) => ({ label: value, value })),
-      },
+      renderText: (value) => value || "—",
     },
     {
       title: "Role",
       dataIndex: "role",
       valueType: "select",
-      fieldProps: {
-        options: ["Employee", "Manager", "Administrator"].map((value) => ({ label: value, value })),
-      },
-      render: (_, record) => <Tag color={roleColors[record.role]}>{record.role}</Tag>,
+      fieldProps: { options: roleOptions },
+      render: (_, record) => (
+        <Tag color={roleColors[record.role]}>{roleLabels[record.role]}</Tag>
+      ),
     },
     {
       title: "Status",
       dataIndex: "status",
       valueType: "select",
-      fieldProps: {
-        options: ["Active", "Invited", "Suspended"].map((value) => ({ label: value, value })),
-      },
-      render: (_, record) => <Tag color={statusColors[record.status]}>{record.status}</Tag>,
+      fieldProps: { options: statusOptions },
+      render: (_, record) => (
+        <Tag color={statusColors[record.status]}>
+          {statusLabels[record.status]}
+        </Tag>
+      ),
     },
     {
       title: "Last active",
-      dataIndex: "lastActive",
+      dataIndex: "lastActiveAt",
       search: false,
+      renderText: (value) =>
+        value ? new Date(value).toLocaleString() : "Never",
     },
     {
       title: "Actions",
@@ -102,14 +150,51 @@ export function UsersPage() {
                   setModalOpen(true);
                 },
               },
-              { key: "resend", label: "Resend invitation", icon: <MailOutlined />, disabled: record.status !== "Invited" },
-              { key: "reset", label: "Reset sessions", icon: <UserSwitchOutlined /> },
+              {
+                key: "reset",
+                label: "Revoke all sessions",
+                icon: <UserSwitchOutlined />,
+                onClick: () =>
+                  modal.confirm({
+                    title: "Revoke all sessions?",
+                    content: `${record.name} will need to sign in again on every device.`,
+                    okText: "Revoke sessions",
+                    onOk: async () => {
+                      await apiRequest(
+                        `/admin/users/${record.id}/reset-sessions`,
+                        { method: "POST" },
+                      );
+                      message.success("All active sessions were revoked");
+                    },
+                  }),
+              },
               { type: "divider" },
-              { key: "suspend", label: "Suspend account", icon: <LockOutlined />, danger: true, disabled: record.status === "Suspended" },
+              {
+                key: "suspend",
+                label: "Suspend account",
+                icon: <LockOutlined />,
+                danger: true,
+                disabled: record.status === "SUSPENDED",
+                onClick: () =>
+                  modal.confirm({
+                    title: "Suspend this account?",
+                    content: `${record.name} will lose access and all active sessions will be revoked.`,
+                    okText: "Suspend",
+                    okButtonProps: { danger: true },
+                    onOk: async () => {
+                      await updateUser(record, { status: "SUSPENDED" });
+                      message.success("Account suspended");
+                    },
+                  }),
+              },
             ],
           }}
         >
-          <Button type="text" icon={<MoreOutlined />} aria-label={`Actions for ${record.name}`} />
+          <Button
+            type="text"
+            icon={<MoreOutlined />}
+            aria-label={`Actions for ${record.name}`}
+          />
         </Dropdown>,
       ],
     },
@@ -121,19 +206,51 @@ export function UsersPage() {
       title="User management"
       subTitle="Manage employee access, roles, and account status."
       extra={[
-        <Button key="invite" type="primary" icon={<PlusOutlined />} onClick={() => {
-          setEditingUser(undefined);
-          setModalOpen(true);
-        }}>
-          Invite user
+        <Button
+          key="create"
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={() => {
+            setEditingUser(undefined);
+            setModalOpen(true);
+          }}
+        >
+          Create user
         </Button>,
       ]}
     >
       <ProCard split="vertical" className="admin-stat-strip">
-        <ProCard><Statistic title="Total users" value={users.length} prefix={<TeamOutlined />} /></ProCard>
-        <ProCard><Statistic title="Active" value={users.filter((user) => user.status === "Active").length} /></ProCard>
-        <ProCard><Statistic title="Pending invitations" value={users.filter((user) => user.status === "Invited").length} /></ProCard>
-        <ProCard><Statistic title="Administrators" value={users.filter((user) => user.role === "Administrator").length} /></ProCard>
+        <ProCard>
+          <Statistic
+            loading={isLoading}
+            title="Total users"
+            value={users.length}
+            prefix={<TeamOutlined />}
+          />
+        </ProCard>
+        <ProCard>
+          <Statistic
+            loading={isLoading}
+            title="Active"
+            value={users.filter((user) => user.status === "ACTIVE").length}
+          />
+        </ProCard>
+        <ProCard>
+          <Statistic
+            loading={isLoading}
+            title="Suspended"
+            value={users.filter((user) => user.status === "SUSPENDED").length}
+          />
+        </ProCard>
+        <ProCard>
+          <Statistic
+            loading={isLoading}
+            title="Administrators"
+            value={
+              users.filter((user) => user.role === "ADMINISTRATOR").length
+            }
+          />
+        </ProCard>
       </ProCard>
 
       <ProTable<UserRecord>
@@ -141,45 +258,58 @@ export function UsersPage() {
         rowKey="id"
         columns={columns}
         dataSource={users}
-        options={{ density: false, fullScreen: true, reload: false }}
-        pagination={{ pageSize: 8, showSizeChanger: false }}
+        loading={isLoading}
+        options={{
+          density: false,
+          fullScreen: true,
+          reload: () => void refetch(),
+        }}
+        pagination={{ pageSize: 10, showSizeChanger: false }}
         search={{ labelWidth: "auto", defaultCollapsed: false }}
         toolbar={{ title: "Directory" }}
       />
 
       <ModalForm
         open={modalOpen}
-        title={editingUser ? "Edit user" : "Invite user"}
+        title={editingUser ? "Edit user" : "Create user"}
         modalProps={{
           destroyOnHidden: true,
           onCancel: () => setModalOpen(false),
         }}
-        initialValues={editingUser}
+        initialValues={
+          editingUser ?? {
+            role: "EMPLOYEE",
+            status: "ACTIVE",
+          }
+        }
         onFinish={async (values) => {
-          if (editingUser) {
-            setUsers((current) =>
-              current.map((user) =>
-                user.id === editingUser.id ? { ...user, ...values } : user,
-              ),
-            );
-            message.success("User updated");
-          } else {
-            setUsers((current) => [
-              ...current,
-              {
-                id: `usr-${Date.now()}`,
+          try {
+            if (editingUser) {
+              const payload = {
                 name: values.name,
-                email: values.email,
                 department: values.department,
                 role: values.role,
-                status: "Invited",
-                lastActive: "Not signed in",
-              },
-            ]);
-            message.success("Invitation sent");
+                status: values.status,
+                password: values.password || undefined,
+              };
+              await updateUser(editingUser, payload);
+              message.success("User updated");
+            } else {
+              await apiRequest<UserRecord>("/admin/users", {
+                method: "POST",
+                body: JSON.stringify(values),
+              });
+              await refetch();
+              message.success("User created and can sign in");
+            }
+            setModalOpen(false);
+            return true;
+          } catch (cause) {
+            message.error(
+              cause instanceof Error ? cause.message : "Could not save user",
+            );
+            return false;
           }
-          setModalOpen(false);
-          return true;
         }}
       >
         <ProFormText
@@ -192,25 +322,61 @@ export function UsersPage() {
           name="email"
           label="Work email"
           placeholder="name@company.com"
+          disabled={Boolean(editingUser)}
           rules={[
             { required: true, message: "Enter a work email" },
             { type: "email", message: "Enter a valid email" },
           ]}
         />
-        <ProFormSelect
+        <ProFormText
           name="department"
           label="Department"
-          options={["Operations", "Finance", "Executive office", "Information security", "Legal", "People operations"].map((value) => ({ label: value, value }))}
-          rules={[{ required: true, message: "Choose a department" }]}
+          placeholder="Enter department"
         />
         <ProFormSelect
           name="role"
           label="Role"
-          initialValue="Employee"
-          options={["Employee", "Manager", "Administrator"].map((value) => ({ label: value, value }))}
+          options={roleOptions}
           rules={[{ required: true, message: "Choose a role" }]}
+        />
+        {editingUser && (
+          <ProFormSelect
+            name="status"
+            label="Status"
+            options={statusOptions}
+            rules={[{ required: true, message: "Choose a status" }]}
+          />
+        )}
+        <ProFormText.Password
+          name="password"
+          label={editingUser ? "New password" : "Temporary password"}
+          placeholder={
+            editingUser
+              ? "Leave blank to keep the current password"
+              : "At least 12 characters"
+          }
+          rules={
+            editingUser
+              ? [{ min: 12, message: "Password must be at least 12 characters" }]
+              : [
+                  { required: true, message: "Enter a temporary password" },
+                  {
+                    min: 12,
+                    message: "Password must be at least 12 characters",
+                  },
+                ]
+          }
         />
       </ModalForm>
     </PageContainer>
   );
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }

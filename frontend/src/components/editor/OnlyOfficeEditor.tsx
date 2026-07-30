@@ -1,11 +1,6 @@
+import { LoadingOutlined } from "@ant-design/icons";
+import { Alert, Spin } from "antd";
 import { useEffect, useRef, useState } from "react";
-import {
-  CheckCircleOutlined,
-  CloudServerOutlined,
-  FileTextOutlined,
-  LoadingOutlined,
-} from "@ant-design/icons";
-import { Alert, Spin, Space, Typography } from "antd";
 import { apiRequest, isApiConfigured } from "@/lib/api";
 
 declare global {
@@ -30,138 +25,137 @@ interface EditorConfigResponse {
 
 export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const editorInstanceRef = useRef<{ destroy?: () => void } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
-  const editorInstanceRef = useRef<{ destroy?: () => void } | null>(null);
 
   useEffect(() => {
     if (!documentId || !isApiConfigured) {
+      setError(
+        !documentId
+          ? "Document ID is missing"
+          : "VITE_API_URL is not configured",
+      );
       setLoading(false);
       return;
     }
 
-    let isMounted = true;
+    let active = true;
     setLoading(true);
     setError(undefined);
 
-    async function initEditor() {
+    const initialize = async () => {
       try {
-        const res = await apiRequest<EditorConfigResponse>(
+        const response = await apiRequest<EditorConfigResponse>(
           `/documents/${documentId}/editor-config`,
         );
+        if (!active) return;
 
-        if (!isMounted) return;
-
-        const serverUrl = res.onlyofficeServerUrl.replace(/\/$/, "");
-        const scriptUrl = `${serverUrl}/web-apps/apps/api/documents/api.js`;
-
-        // Check if script already loaded or load it dynamically
+        const serverUrl = response.onlyofficeServerUrl.replace(/\/$/, "");
         if (!window.DocsAPI) {
-          await new Promise<void>((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = scriptUrl;
-            script.async = true;
-            script.onload = () => resolve();
-            script.onerror = () =>
-              reject(new Error(`Failed to load ONLYOFFICE SDK from ${scriptUrl}`));
-            document.body.appendChild(script);
-          });
-        }
-
-        if (!isMounted) return;
-
-        if (window.DocsAPI && containerRef.current) {
-          // Clear any previous editor container
-          containerRef.current.innerHTML = "";
-          const editorDiv = document.createElement("div");
-          editorDiv.id = `onlyoffice-editor-${documentId}`;
-          editorDiv.style.width = "100%";
-          editorDiv.style.height = "100%";
-          containerRef.current.appendChild(editorDiv);
-
-          editorInstanceRef.current = new window.DocsAPI.DocEditor(
-            editorDiv.id,
-            res.config,
+          await loadScript(
+            `${serverUrl}/web-apps/apps/api/documents/api.js`,
           );
         }
-      } catch (err) {
-        if (isMounted) {
-          console.warn("[ONLYOFFICE] Failed to init editor:", err);
+        if (!active) return;
+        if (!window.DocsAPI || !containerRef.current) {
+          throw new Error("ONLYOFFICE SDK did not initialize");
+        }
+
+        containerRef.current.innerHTML = "";
+        const editorElement = window.document.createElement("div");
+        editorElement.id = `onlyoffice-editor-${documentId}`;
+        editorElement.style.width = "100%";
+        editorElement.style.height = "100%";
+        containerRef.current.appendChild(editorElement);
+        editorInstanceRef.current = new window.DocsAPI.DocEditor(
+          editorElement.id,
+          response.config,
+        );
+      } catch (cause) {
+        if (active) {
           setError(
-            err instanceof Error ? err.message : "Failed to load ONLYOFFICE editor",
+            cause instanceof Error
+              ? cause.message
+              : "Could not load the ONLYOFFICE editor",
           );
         }
       } finally {
-        if (isMounted) setLoading(false);
+        if (active) setLoading(false);
       }
-    }
+    };
 
-    initEditor();
-
+    void initialize();
     return () => {
-      isMounted = false;
-      if (editorInstanceRef.current?.destroy) {
-        editorInstanceRef.current.destroy();
-      }
+      active = false;
+      editorInstanceRef.current?.destroy?.();
+      editorInstanceRef.current = null;
     };
   }, [documentId]);
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100%" }}>
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 36 }} spin />} tip="Đang tải trình soạn thảo ONLYOFFICE..." />
-      </div>
-    );
-  }
-
-  if (error || !isApiConfigured || !documentId) {
-    return (
-      <div className="editor-fallback">
+  return (
+    <div style={{ width: "100%", height: "100%", minHeight: 650 }}>
+      {error ? (
         <Alert
           showIcon
-          type={error ? "warning" : "info"}
-          message={error ? "Không thể kết nối ONLYOFFICE Server" : "Chế độ xem thử (Preview Mode)"}
-          description={
-            error
-              ? `${error}. Đang hiển thị bản xem trước mẫu.`
-              : "Trình soạn thảo sẽ được kích hoạt khi mở từ hệ thống."
-          }
+          type="error"
+          message="ONLYOFFICE editor is unavailable"
+          description={error}
+          style={{ margin: 24 }}
         />
-        <div className="document-paper">
-          <div className="document-paper-heading">
-            <FileTextOutlined />
-            <span>KẾ HOẠCH HOẠT ĐỘNG</span>
-          </div>
-          <Typography.Title>Kế hoạch hoạt động Q3</Typography.Title>
-          <Typography.Paragraph type="secondary">
-            Tài liệu chuẩn bị cho buổi đánh giá hoạt động hàng tháng
-          </Typography.Paragraph>
-          <Typography.Title level={3}>Tóm tắt điều hành</Typography.Title>
-          <Typography.Paragraph>
-            Kế hoạch quý 3 điều chỉnh năng lực vận hành phù hợp với tiến độ giao hàng đã phê duyệt. Các chủ sở hữu bộ phận cần xác nhận các mốc quan trọng và sự phụ thuộc trước họp đánh giá.
-          </Typography.Paragraph>
-          <div className="document-callout">
-            <CheckCircleOutlined />
-            <div>
-              <strong>Trọng tâm đánh giá</strong>
-              <span>Xác nhận quyền sở hữu, giả định ngân sách và ngày hoàn thành.</span>
-            </div>
-          </div>
-          <Space className="onlyoffice-setup-note">
-            <CloudServerOutlined />
-            <Typography.Text type="secondary">
-              Mở file qua tài khoản công ty để kích hoạt chỉnh sửa trực tiếp với ONLYOFFICE.
-            </Typography.Text>
-          </Space>
+      ) : null}
+      {loading ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100%",
+          }}
+        >
+          <Spin
+            indicator={<LoadingOutlined style={{ fontSize: 36 }} spin />}
+            tip="Loading ONLYOFFICE editor..."
+          />
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={containerRef}
-      style={{ width: "100%", height: "100%", minHeight: "650px" }}
-    />
+      ) : null}
+      <div
+        ref={containerRef}
+        hidden={loading || Boolean(error)}
+        style={{ width: "100%", height: "100%", minHeight: 650 }}
+      />
+    </div>
   );
+}
+
+function loadScript(source: string) {
+  const existing = window.document.querySelector<HTMLScriptElement>(
+    `script[src="${source}"]`,
+  );
+  if (existing) {
+    return new Promise<void>((resolve, reject) => {
+      if (window.DocsAPI) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error(`Failed to load ONLYOFFICE SDK from ${source}`)),
+        { once: true },
+      );
+    });
+  }
+  return new Promise<void>((resolve, reject) => {
+    const script = window.document.createElement("script");
+    script.src = source;
+    script.async = true;
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener(
+      "error",
+      () => reject(new Error(`Failed to load ONLYOFFICE SDK from ${source}`)),
+      { once: true },
+    );
+    window.document.body.appendChild(script);
+  });
 }

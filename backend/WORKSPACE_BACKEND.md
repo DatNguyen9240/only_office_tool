@@ -3,8 +3,8 @@
 ## Purpose
 
 This document defines the backend foundation for the Meridian DMS frontend.
-The current frontend uses sample data and local UI state. The backend will
-replace those placeholders with authenticated, persistent document workflows.
+The active frontend routes use authenticated API data for documents, folders,
+dashboard metrics, user administration, and audit history.
 
 ## Local Architecture
 
@@ -138,6 +138,8 @@ POST   /auth/logout
 POST   /auth/refresh
 GET    /auth/me
 
+GET    /dashboard
+
 GET    /documents?scope=all|shared|trash&folderId=...
 POST   /documents/upload
 POST   /documents/upload-url
@@ -165,7 +167,9 @@ GET    /documents/:id/editor-config
 POST   /documents/:id/onlyoffice/callback
 
 GET    /admin/users
+POST   /admin/users
 PATCH  /admin/users/:id
+POST   /admin/users/:id/reset-sessions
 GET    /admin/audit
 
 GET    /folders?parentId=...

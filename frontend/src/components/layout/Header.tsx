@@ -4,7 +4,7 @@ import {
   QuestionCircleOutlined,
   SearchOutlined,
 } from "@ant-design/icons";
-import { Avatar, Badge, Button, Dropdown, Input, Space, Tooltip } from "antd";
+import { Avatar, Button, Dropdown, Input, Space, Tooltip } from "antd";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
@@ -50,19 +50,31 @@ export function Header() {
         onPressEnter={() => navigate(`/documents?q=${encodeURIComponent(query)}`)}
       />
       <Space size={4}>
-        <Tooltip title="Help center">
-          <Button type="text" icon={<QuestionCircleOutlined />} aria-label="Help center" />
+        <Tooltip title="Help center is not available yet">
+          <Button
+            disabled
+            type="text"
+            icon={<QuestionCircleOutlined />}
+            aria-label="Help center"
+          />
         </Tooltip>
-        <Tooltip title="Notifications">
-          <Badge dot offset={[-7, 8]}>
-            <Button type="text" icon={<BellOutlined />} aria-label="Notifications" />
-          </Badge>
+        <Tooltip title="Notifications are not available yet">
+          <Button
+            disabled
+            type="text"
+            icon={<BellOutlined />}
+            aria-label="Notifications"
+          />
         </Tooltip>
         <Dropdown
           menu={{
             items: [
-              { key: "profile", label: "Profile and settings" },
-              { key: "security", label: "Security" },
+              {
+                key: "profile",
+                label: "Profile and settings",
+                disabled: true,
+              },
+              { key: "security", label: "Security", disabled: true },
               { type: "divider" },
               {
                 key: "signout",

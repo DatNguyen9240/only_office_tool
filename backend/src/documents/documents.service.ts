@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -18,6 +19,7 @@ import type {
   DocumentType as PublicDocumentType,
 } from "@share";
 import type { AuthenticatedUser } from "../auth/auth.types";
+import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 import {
@@ -71,6 +73,7 @@ export class DocumentsService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly storage: StorageService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   async list(
@@ -116,6 +119,7 @@ export class DocumentsService {
     });
 
     if (!document) throw new NotFoundException("Document not found");
+    await this.record(user.id, "DOCUMENT_UPDATED", id, document.name);
     return this.toPublicItem(document, user.id);
   }
 
@@ -149,21 +153,23 @@ export class DocumentsService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<{ id: string; status: "deleted" }> {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
     await this.prisma.document.update({
       where: { id },
       data: { deletedAt: new Date(), status: DocumentStatus.DELETED },
     });
+    await this.record(user.id, "DOCUMENT_DELETED", id, document.name);
     return { id, status: "deleted" };
   }
 
   async restore(id: string, user: AuthenticatedUser): Promise<DocumentItem> {
-    await this.ensureOwnedDocument(id, user);
+    const ownedDocument = await this.ensureOwnedDocument(id, user);
     const document = await this.prisma.document.update({
       where: { id },
       data: { deletedAt: null, status: DocumentStatus.READY },
       include: this.publicInclude(user),
     });
+    await this.record(user.id, "DOCUMENT_RESTORED", id, ownedDocument.name);
     return this.toPublicItem(document, user.id);
   }
 
@@ -176,6 +182,7 @@ export class DocumentsService {
       },
       select: {
         id: true,
+        name: true,
         versions: { select: { objectKey: true } },
       },
     });
@@ -184,6 +191,12 @@ export class DocumentsService {
       document.versions.map((version) => version.objectKey),
     );
     await this.prisma.document.delete({ where: { id } });
+    await this.record(
+      user.id,
+      "DOCUMENT_PERMANENTLY_DELETED",
+      id,
+      document.name,
+    );
     return { id, status: "deleted_permanently" as const };
   }
 
@@ -195,6 +208,7 @@ export class DocumentsService {
       },
       select: {
         id: true,
+        name: true,
         versions: { select: { objectKey: true } },
       },
     });
@@ -210,6 +224,16 @@ export class DocumentsService {
         deletedAt: { not: null },
       },
     });
+    await Promise.all(
+      documents.map((document) =>
+        this.record(
+          user.id,
+          "DOCUMENT_PERMANENTLY_DELETED",
+          document.id,
+          document.name,
+        ),
+      ),
+    );
     return { status: "trash_emptied" as const, count: deleted.count };
   }
 
@@ -219,7 +243,7 @@ export class DocumentsService {
   ): Promise<DocumentItem> {
     const current = await this.prisma.document.findFirst({
       where: { id, ...this.ownerWhere(user) },
-      select: { starred: true },
+      select: { starred: true, name: true },
     });
     if (!current) throw new NotFoundException("Document not found");
 
@@ -228,6 +252,12 @@ export class DocumentsService {
       data: { starred: !current.starred },
       include: this.publicInclude(user),
     });
+    await this.record(
+      user.id,
+      document.starred ? "DOCUMENT_STARRED" : "DOCUMENT_UNSTARRED",
+      id,
+      current.name,
+    );
     return this.toPublicItem(document, user.id);
   }
 
@@ -361,7 +391,7 @@ export class DocumentsService {
 
     const document = await this.prisma.document.findFirst({
       where: { id, deletedAt: null },
-      select: { id: true, ownerId: true, type: true },
+      select: { id: true, name: true, ownerId: true, type: true },
     });
     if (!document) throw new NotFoundException("Document not found");
 
@@ -434,6 +464,12 @@ export class DocumentsService {
       return created;
     });
 
+    await this.record(
+      principal.userId,
+      "DOCUMENT_UPDATED",
+      id,
+      document.name,
+    );
     return { error: 0, version: result.version };
   }
 
@@ -442,7 +478,7 @@ export class DocumentsService {
     input: CreatePermissionDto,
     user: AuthenticatedUser,
   ) {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
 
     const targetUser = await this.prisma.user.findUnique({
       where: { email: input.email },
@@ -471,11 +507,12 @@ export class DocumentsService {
       include: { user: { select: { name: true } } },
     });
 
+    await this.record(user.id, "PERMISSION_GRANTED", id, document.name);
     return this.toPermissionEntry(permission);
   }
 
   async listPermissions(id: string, user: AuthenticatedUser) {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
     const permissions = await this.prisma.documentPermission.findMany({
       where: { documentId: id },
       include: { user: { select: { name: true } } },
@@ -490,7 +527,7 @@ export class DocumentsService {
     input: UpdatePermissionDto,
     user: AuthenticatedUser,
   ) {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
     const updated = await this.prisma.documentPermission.updateMany({
       where: { id: permissionId, documentId: id },
       data: { role: input.role, grantedById: user.id },
@@ -500,6 +537,7 @@ export class DocumentsService {
       where: { id: permissionId },
       include: { user: { select: { name: true } } },
     });
+    await this.record(user.id, "PERMISSION_UPDATED", id, document.name);
     return this.toPermissionEntry(permission);
   }
 
@@ -508,11 +546,12 @@ export class DocumentsService {
     permissionId: string,
     user: AuthenticatedUser,
   ) {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
     const removed = await this.prisma.documentPermission.deleteMany({
       where: { id: permissionId, documentId: id },
     });
     if (removed.count !== 1) throw new NotFoundException("Permission not found");
+    await this.record(user.id, "PERMISSION_REVOKED", id, document.name);
     return { id: permissionId, status: "removed" };
   }
 
@@ -544,7 +583,7 @@ export class DocumentsService {
     versionNumber: number,
     user: AuthenticatedUser,
   ) {
-    await this.ensureOwnedDocument(id, user);
+    const document = await this.ensureOwnedDocument(id, user);
     const targetVersion = await this.prisma.documentVersion.findFirst({
       where: { documentId: id, version: versionNumber },
     });
@@ -574,6 +613,7 @@ export class DocumentsService {
       return created;
     });
 
+    await this.record(user.id, "VERSION_RESTORED", id, document.name);
     return {
       version: newVersion.version,
       status: "restored",
@@ -595,21 +635,38 @@ export class DocumentsService {
       select: { objectKey: true },
     });
     if (!version) throw new NotFoundException("Version not found");
-    return {
+    const download = {
       documentId: id,
       name: document.name,
       version: versionNumber,
       ...(await this.storage.createDownloadUrl(version.objectKey)),
     };
+    await this.record(user.id, "VERSION_DOWNLOADED", id, document.name);
+    return download;
   }
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.ownerWhere(user) },
-      select: { id: true, ownerId: true },
+      select: { id: true, name: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;
+  }
+
+  private async record(
+    actorId: string,
+    action: string,
+    resourceId: string,
+    name: string,
+  ) {
+    await this.audit?.record({
+      actorId,
+      action,
+      resourceType: "DOCUMENT",
+      resourceId,
+      metadata: { name },
+    });
   }
 
   private publicInclude(user: AuthenticatedUser) {

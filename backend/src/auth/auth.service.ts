@@ -8,6 +8,7 @@ import { UserStatus, type UserRole } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
 import { createHash, randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service";
 import type {
   AccessTokenPayload,
   AuthenticatedUser,
@@ -23,6 +24,11 @@ interface TokenUser {
   role: UserRole;
 }
 
+interface RequestContext {
+  ip?: string;
+  userAgent?: string;
+}
+
 @Injectable()
 export class AuthService {
   private readonly accessTtlSeconds: number;
@@ -33,6 +39,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly audit: AuditService,
     config: ConfigService,
   ) {
     this.accessSecret = config.getOrThrow<string>("JWT_ACCESS_SECRET");
@@ -47,7 +54,7 @@ export class AuthService {
     );
   }
 
-  async login(input: LoginDto) {
+  async login(input: LoginDto, context: RequestContext = {}) {
     const user = await this.prisma.user.findUnique({
       where: { email: input.email },
       select: {
@@ -63,10 +70,29 @@ export class AuthService {
     const validPassword =
       user?.passwordHash && (await compare(input.password, user.passwordHash));
     if (!user || !validPassword || user.status !== UserStatus.ACTIVE) {
+      await this.audit.record({
+        actorId: user?.id,
+        action: "LOGIN",
+        resourceType: "AUTH_SESSION",
+        outcome: "DENIED",
+        ip: context.ip,
+        userAgent: context.userAgent,
+        metadata: { email: input.email.trim().toLowerCase() },
+      });
       throw new UnauthorizedException("Email or password is incorrect");
     }
 
-    return this.createSession(user);
+    const response = await this.createSession(user);
+    await this.audit.record({
+      actorId: user.id,
+      action: "LOGIN",
+      resourceType: "AUTH_SESSION",
+      resourceId: user.id,
+      ip: context.ip,
+      userAgent: context.userAgent,
+      metadata: { name: user.name },
+    });
+    return response;
   }
 
   async refresh(principal: RefreshPrincipal) {
@@ -122,7 +148,7 @@ export class AuthService {
     return this.response(session.user, tokens);
   }
 
-  async logout(principal: RefreshPrincipal) {
+  async logout(principal: RefreshPrincipal, context: RequestContext = {}) {
     await this.prisma.refreshSession.updateMany({
       where: {
         id: principal.sessionId,
@@ -131,6 +157,14 @@ export class AuthService {
         revokedAt: null,
       },
       data: { revokedAt: new Date() },
+    });
+    await this.audit.record({
+      actorId: principal.userId,
+      action: "LOGOUT",
+      resourceType: "AUTH_SESSION",
+      resourceId: principal.sessionId,
+      ip: context.ip,
+      userAgent: context.userAgent,
     });
     return { status: "logged_out" as const };
   }

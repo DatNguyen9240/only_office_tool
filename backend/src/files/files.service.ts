@@ -3,10 +3,12 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import { DocumentType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import type { AuthenticatedUser } from "../auth/auth.types";
+import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { CompleteUploadDto } from "./dto/complete-upload.dto";
@@ -27,6 +29,7 @@ export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    @Optional() private readonly audit?: AuditService,
   ) {}
 
   async createUploadUrl(
@@ -87,7 +90,7 @@ export class FilesService {
         id: documentId,
         ...(user.role === "ADMINISTRATOR" ? {} : { ownerId: user.id }),
       },
-      select: { id: true, ownerId: true },
+      select: { id: true, name: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
     if (
@@ -138,6 +141,13 @@ export class FilesService {
       return created;
     });
 
+    await this.audit?.record({
+      actorId: user.id,
+      action: "DOCUMENT_CREATED",
+      resourceType: "DOCUMENT",
+      resourceId: documentId,
+      metadata: { name: document.name, version: version.version },
+    });
     return {
       documentId,
       version: version.version,
@@ -188,10 +198,18 @@ export class FilesService {
     });
     if (!version) throw new NotFoundException("Document has no uploaded version");
 
-    return {
+    const download = {
       documentId: document.id,
       name: document.name,
       ...(await this.storage.createDownloadUrl(version.objectKey)),
     };
+    await this.audit?.record({
+      actorId: user.id,
+      action: "DOCUMENT_DOWNLOADED",
+      resourceType: "DOCUMENT",
+      resourceId: document.id,
+      metadata: { name: document.name },
+    });
+    return download;
   }
 }

@@ -2,14 +2,19 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
+import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFolderDto } from "./dto/create-folder.dto";
 import { UpdateFolderDto } from "./dto/update-folder.dto";
 
 @Injectable()
 export class FoldersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly audit?: AuditService,
+  ) {}
 
   async list(ownerId: string, parentId?: string) {
     const folders = await this.prisma.folder.findMany({
@@ -38,6 +43,7 @@ export class FoldersService {
         ...(input.parentId ? { parentId: input.parentId } : {}),
       },
     });
+    await this.record(ownerId, "FOLDER_CREATED", folder.id, folder.name);
     return { id: folder.id, name: folder.name, parentId: folder.parentId ?? undefined, count: 0 };
   }
 
@@ -54,6 +60,7 @@ export class FoldersService {
       },
       include: { _count: { select: { documents: true, children: true } } },
     });
+    await this.record(ownerId, "FOLDER_UPDATED", folder.id, folder.name);
     return {
       id: folder.id,
       name: folder.name,
@@ -72,6 +79,7 @@ export class FoldersService {
       throw new ConflictException("Folder must be empty before deletion");
     }
     await this.prisma.folder.delete({ where: { id } });
+    await this.record(ownerId, "FOLDER_DELETED", id, folder.name);
     return { id, status: "deleted" as const };
   }
 
@@ -108,5 +116,20 @@ export class FoldersService {
       if (!current) throw new NotFoundException("Parent folder not found");
       currentId = current.parentId;
     }
+  }
+
+  private async record(
+    actorId: string,
+    action: string,
+    resourceId: string,
+    name: string,
+  ) {
+    await this.audit?.record({
+      actorId,
+      action,
+      resourceType: "FOLDER",
+      resourceId,
+      metadata: { name },
+    });
   }
 }

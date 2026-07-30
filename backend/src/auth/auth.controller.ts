@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Post,
+  Req,
   UseGuards,
 } from "@nestjs/common";
 import { AuthService } from "./auth.service";
@@ -20,8 +21,11 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post("login")
-  login(@Body() input: LoginDto) {
-    return this.auth.login(input);
+  login(
+    @Body() input: LoginDto,
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
+  ) {
+    return this.auth.login(input, this.requestContext(request));
   }
 
   @UseGuards(JwtRefreshGuard)
@@ -32,13 +36,27 @@ export class AuthController {
 
   @UseGuards(JwtRefreshGuard)
   @Post("logout")
-  logout(@CurrentUser() principal: RefreshPrincipal) {
-    return this.auth.logout(principal);
+  logout(
+    @CurrentUser() principal: RefreshPrincipal,
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
+  ) {
+    return this.auth.logout(principal, this.requestContext(request));
   }
 
   @UseGuards(JwtAuthGuard)
   @Get("me")
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.auth.me(user);
+  }
+
+  private requestContext(request: {
+    ip?: string;
+    headers: Record<string, string | string[] | undefined>;
+  }) {
+    const userAgent = request.headers["user-agent"];
+    return {
+      ip: request.ip,
+      userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
+    };
   }
 }

@@ -10,6 +10,9 @@ import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
 import type { PrismaService } from "../src/prisma/prisma.service";
 import type { StorageService } from "../src/storage/storage.service";
+import type { AuditService } from "../src/audit/audit.service";
+import { AdminService } from "../src/admin/admin.service";
+import { AuthService } from "../src/auth/auth.service";
 import { DocumentsService } from "../src/documents/documents.service";
 import { FilesService } from "../src/files/files.service";
 import { FoldersService } from "../src/folders/folders.service";
@@ -110,5 +113,82 @@ test("ONLYOFFICE callback rejects an invalid ticket before fetching", async () =
         url: "http://127.0.0.1/private",
       }),
     UnauthorizedException,
+  );
+});
+
+test("a denied login is recorded in the audit log", async () => {
+  const events: Array<{ action: string; outcome?: string }> = [];
+  const prisma = {
+    user: {
+      findUnique: async () => ({
+        id: "user-1",
+        email: "owner@example.com",
+        name: "Owner",
+        role: "EMPLOYEE",
+        status: "ACTIVE",
+        passwordHash: null,
+      }),
+    },
+  } as unknown as PrismaService;
+  const config = {
+    getOrThrow: (key: string) => `${key}-with-at-least-32-characters`,
+    get: () => undefined,
+  } as unknown as ConfigService;
+  const audit = {
+    record: async (event: { action: string; outcome?: string }) => {
+      events.push(event);
+      return {};
+    },
+  } as unknown as AuditService;
+  const service = new AuthService(
+    prisma,
+    {} as JwtService,
+    audit,
+    config,
+  );
+
+  await assert.rejects(
+    () =>
+      service.login({
+        email: "owner@example.com",
+        password: "incorrect-password",
+      }),
+    UnauthorizedException,
+  );
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.action, "LOGIN");
+  assert.equal(events[0]?.outcome, "DENIED");
+});
+
+test("the last active administrator cannot be suspended", async () => {
+  const prisma = {
+    user: {
+      findUnique: async () => ({
+        id: "admin-1",
+        name: "Administrator",
+        role: "ADMINISTRATOR",
+        status: "ACTIVE",
+      }),
+      count: async () => 1,
+    },
+  } as unknown as PrismaService;
+  const service = new AdminService(
+    prisma,
+    {} as AuditService,
+  );
+
+  await assert.rejects(
+    () =>
+      service.updateUser(
+        "admin-1",
+        { status: "SUSPENDED" },
+        {
+          id: "admin-1",
+          email: "admin@example.com",
+          name: "Administrator",
+          role: "ADMINISTRATOR",
+        },
+      ),
+    BadRequestException,
   );
 });

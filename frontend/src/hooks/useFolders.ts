@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { folders as sampleFolders } from "@/data/sampleData";
-import { apiRequest, isApiConfigured } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 
 export interface FolderItem {
   id: string;
@@ -12,11 +11,7 @@ export interface FolderItem {
 export function useFolders() {
   return useQuery({
     queryKey: ["folders"],
-    queryFn: async ({ signal }): Promise<FolderItem[]> => {
-      if (isApiConfigured) {
-        return apiRequest<FolderItem[]>("/folders", { signal });
-      }
-      return sampleFolders;
-    },
+    queryFn: ({ signal }): Promise<FolderItem[]> =>
+      apiRequest<FolderItem[]>("/folders", { signal }),
   });
 }

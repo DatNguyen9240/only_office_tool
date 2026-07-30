@@ -8,23 +8,40 @@ import {
   ProTable,
   type ProColumns,
 } from "@ant-design/pro-components";
-import { App, Button, Descriptions, Drawer, Tag, Typography } from "antd";
+import { useQuery } from "@tanstack/react-query";
+import {
+  App,
+  Button,
+  Descriptions,
+  Drawer,
+  Tag,
+  Typography,
+} from "antd";
 import { useMemo, useState } from "react";
-import { auditRecords } from "@/data/sampleData";
 import type { AuditRecord } from "@share";
+import { apiRequest } from "@/lib/api";
 
 export function AuditPage() {
   const { message } = App.useApp();
   const [selected, setSelected] = useState<AuditRecord>();
+  const {
+    data: auditRecords = [],
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["admin", "audit"],
+    queryFn: ({ signal }) =>
+      apiRequest<AuditRecord[]>("/admin/audit?limit=500", { signal }),
+  });
 
   const columns = useMemo<ProColumns<AuditRecord>[]>(
     () => [
       {
         title: "Time",
         dataIndex: "timestamp",
-        valueType: "dateTimeRange",
+        valueType: "dateTime",
         width: 190,
-        render: (_, record) => record.timestamp,
+        renderText: (value) => new Date(value).toLocaleString(),
       },
       {
         title: "Actor",
@@ -36,11 +53,14 @@ export function AuditPage() {
         dataIndex: "action",
         valueType: "select",
         fieldProps: {
-          options: [...new Set(auditRecords.map((record) => record.action))].map((value) => ({
-            label: value,
-            value,
-          })),
+          options: [...new Set(auditRecords.map((record) => record.action))].map(
+            (value) => ({
+              label: formatAction(value),
+              value,
+            }),
+          ),
         },
+        renderText: (value) => formatAction(value),
       },
       {
         title: "Resource",
@@ -53,13 +73,14 @@ export function AuditPage() {
         valueType: "select",
         fieldProps: {
           options: [
-            { label: "Success", value: "Success" },
-            { label: "Denied", value: "Denied" },
+            { label: "Success", value: "SUCCESS" },
+            { label: "Denied", value: "DENIED" },
+            { label: "Failed", value: "FAILED" },
           ],
         },
         render: (_, record) => (
-          <Tag color={record.outcome === "Success" ? "green" : "red"}>
-            {record.outcome}
+          <Tag color={record.outcome === "SUCCESS" ? "green" : "red"}>
+            {formatAction(record.outcome)}
           </Tag>
         ),
       },
@@ -85,8 +106,49 @@ export function AuditPage() {
         ],
       },
     ],
-    [],
+    [auditRecords],
   );
+
+  const exportCsv = () => {
+    if (!auditRecords.length) {
+      message.info("There are no audit events to export");
+      return;
+    }
+    const rows = [
+      [
+        "Event ID",
+        "Timestamp",
+        "Actor",
+        "Actor email",
+        "Action",
+        "Resource",
+        "Outcome",
+        "IP address",
+        "Device",
+      ],
+      ...auditRecords.map((record) => [
+        record.id,
+        record.timestamp,
+        record.actor,
+        record.actorEmail ?? "",
+        record.action,
+        record.resource,
+        record.outcome,
+        record.ip ?? "",
+        record.device ?? "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" }),
+    );
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `meridian-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    message.success(`Exported ${auditRecords.length} audit events`);
+  };
 
   return (
     <PageContainer
@@ -97,7 +159,8 @@ export function AuditPage() {
         <Button
           key="export"
           icon={<DownloadOutlined />}
-          onClick={() => message.success("Filtered audit log exported")}
+          onClick={exportCsv}
+          disabled={isLoading}
         >
           Export CSV
         </Button>,
@@ -106,9 +169,9 @@ export function AuditPage() {
       <div className="audit-assurance">
         <SafetyCertificateOutlined />
         <div>
-          <Typography.Text strong>Immutable event history</Typography.Text>
+          <Typography.Text strong>Recorded event history</Typography.Text>
           <Typography.Text type="secondary">
-            Audit events are retained according to your organization policy.
+            Events shown here are loaded from the audit log database.
           </Typography.Text>
         </div>
       </div>
@@ -116,7 +179,12 @@ export function AuditPage() {
         rowKey="id"
         columns={columns}
         dataSource={auditRecords}
-        options={{ density: false, fullScreen: true, reload: false }}
+        loading={isLoading}
+        options={{
+          density: false,
+          fullScreen: true,
+          reload: () => void refetch(),
+        }}
         search={{ labelWidth: "auto", defaultCollapsed: false }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         toolbar={{ title: "Events" }}
@@ -129,21 +197,45 @@ export function AuditPage() {
       >
         {selected && (
           <Descriptions bordered column={1} size="small">
-            <Descriptions.Item label="Event ID">{selected.id}</Descriptions.Item>
-            <Descriptions.Item label="Timestamp">{selected.timestamp}</Descriptions.Item>
-            <Descriptions.Item label="Actor">{selected.actor}</Descriptions.Item>
-            <Descriptions.Item label="Action">{selected.action}</Descriptions.Item>
-            <Descriptions.Item label="Resource">{selected.resource}</Descriptions.Item>
+            <Descriptions.Item label="Event ID">
+              {selected.id}
+            </Descriptions.Item>
+            <Descriptions.Item label="Timestamp">
+              {new Date(selected.timestamp).toLocaleString()}
+            </Descriptions.Item>
+            <Descriptions.Item label="Actor">
+              {selected.actor}
+              {selected.actorEmail ? ` (${selected.actorEmail})` : ""}
+            </Descriptions.Item>
+            <Descriptions.Item label="Action">
+              {formatAction(selected.action)}
+            </Descriptions.Item>
+            <Descriptions.Item label="Resource">
+              {selected.resource}
+            </Descriptions.Item>
             <Descriptions.Item label="Outcome">
-              <Tag color={selected.outcome === "Success" ? "green" : "red"}>
-                {selected.outcome}
+              <Tag color={selected.outcome === "SUCCESS" ? "green" : "red"}>
+                {formatAction(selected.outcome)}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="IP address">{selected.ip}</Descriptions.Item>
-            <Descriptions.Item label="Device">{selected.device}</Descriptions.Item>
+            <Descriptions.Item label="IP address">
+              {selected.ip ?? "Not captured"}
+            </Descriptions.Item>
+            <Descriptions.Item label="Device">
+              {selected.device ?? "Not captured"}
+            </Descriptions.Item>
           </Descriptions>
         )}
       </Drawer>
     </PageContainer>
   );
+}
+
+function formatAction(value: string) {
+  const normalized = value.replaceAll("_", " ").toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function csvCell(value: string) {
+  return `"${value.replaceAll('"', '""')}"`;
 }

@@ -1,8 +1,8 @@
 import {
   ClockCircleOutlined,
   CloudServerOutlined,
-  FileDoneOutlined,
   FileTextOutlined,
+  FolderOutlined,
   PlusOutlined,
   ShareAltOutlined,
   UploadOutlined,
@@ -11,6 +11,7 @@ import { PageContainer, ProCard } from "@ant-design/pro-components";
 import {
   Avatar,
   Button,
+  Empty,
   List,
   Progress,
   Space,
@@ -18,31 +19,86 @@ import {
   Typography,
 } from "antd";
 import { useNavigate } from "react-router-dom";
-import { activities } from "@/data/sampleData";
-import { useDocuments } from "@/hooks/useDocuments";
 import { FileTable } from "@/components/documents/FileTable";
+import { useDashboard } from "@/hooks/useDashboard";
+import { useDocuments } from "@/hooks/useDocuments";
+import { useAuthStore } from "@/store/useAuthStore";
 
-const metrics = [
-  { title: "Documents", value: 1842, icon: <FileTextOutlined />, detail: "Across 46 folders" },
-  { title: "Shared with me", value: 28, icon: <ShareAltOutlined />, detail: "6 updated this week" },
-  { title: "Waiting for review", value: 7, icon: <ClockCircleOutlined />, detail: "2 due today" },
-  { title: "Approved this month", value: 34, icon: <FileDoneOutlined />, detail: "Across 5 teams" },
-];
+const actionLabels: Record<string, string> = {
+  LOGIN: "signed in",
+  LOGOUT: "signed out",
+  DOCUMENT_CREATED: "uploaded",
+  DOCUMENT_UPDATED: "updated",
+  DOCUMENT_DOWNLOADED: "downloaded",
+  DOCUMENT_DELETED: "moved to trash",
+  DOCUMENT_RESTORED: "restored",
+  DOCUMENT_PERMANENTLY_DELETED: "permanently deleted",
+  VERSION_RESTORED: "restored a version of",
+  PERMISSION_GRANTED: "shared",
+  PERMISSION_UPDATED: "changed access to",
+  PERMISSION_REVOKED: "revoked access to",
+  USER_CREATED: "created user",
+  USER_UPDATED: "updated user",
+  SESSIONS_REVOKED: "revoked sessions for",
+};
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { data = [], isLoading } = useDocuments();
+  const user = useAuthStore((state) => state.user);
+  const { data: documents = [], isLoading: documentsLoading } = useDocuments();
+  const { data: dashboard, isLoading: dashboardLoading } = useDashboard();
+  const metrics = [
+    {
+      title: "Documents",
+      value: dashboard?.metrics.documents ?? 0,
+      icon: <FileTextOutlined />,
+      detail: `${dashboard?.metrics.folders ?? 0} folders`,
+    },
+    {
+      title: "Shared with me",
+      value: dashboard?.metrics.sharedWithMe ?? 0,
+      icon: <ShareAltOutlined />,
+      detail: "Documents shared directly with you",
+    },
+    {
+      title: "Waiting for review",
+      value: dashboard?.metrics.inReview ?? 0,
+      icon: <ClockCircleOutlined />,
+      detail: "Accessible documents in review",
+    },
+    {
+      title: "Versions",
+      value: dashboard?.metrics.versions ?? 0,
+      icon: <FolderOutlined />,
+      detail: "Stored versions in your documents",
+    },
+  ];
+  const greeting =
+    new Date().getHours() < 12
+      ? "Good morning"
+      : new Date().getHours() < 18
+        ? "Good afternoon"
+        : "Good evening";
 
   return (
     <PageContainer
       ghost
-      title="Good morning, Anika"
+      title={`${greeting}, ${user?.name ?? "User"}`}
       subTitle="Here is the current document activity across your workspace."
       extra={[
-        <Button key="folder" icon={<PlusOutlined />}>
+        <Button
+          key="folder"
+          icon={<PlusOutlined />}
+          onClick={() => navigate("/documents")}
+        >
           New folder
         </Button>,
-        <Button key="upload" type="primary" icon={<UploadOutlined />} onClick={() => navigate("/documents")}>
+        <Button
+          key="upload"
+          type="primary"
+          icon={<UploadOutlined />}
+          onClick={() => navigate("/documents")}
+        >
           Upload files
         </Button>,
       ]}
@@ -51,8 +107,14 @@ export function DashboardPage() {
         {metrics.map((metric) => (
           <div className="metric-item" key={metric.title}>
             <div className="metric-icon">{metric.icon}</div>
-            <Statistic title={metric.title} value={metric.value} />
-            <Typography.Text type="secondary">{metric.detail}</Typography.Text>
+            <Statistic
+              loading={dashboardLoading}
+              title={metric.title}
+              value={metric.value}
+            />
+            <Typography.Text type="secondary">
+              {metric.detail}
+            </Typography.Text>
           </div>
         ))}
       </section>
@@ -70,8 +132,8 @@ export function DashboardPage() {
         >
           <FileTable
             compact
-            loading={isLoading}
-            documents={data.slice(0, 5)}
+            loading={documentsLoading}
+            documents={documents.slice(0, 5)}
             onOpen={(document) => navigate(`/editor/${document.id}`)}
           />
         </ProCard>
@@ -80,20 +142,27 @@ export function DashboardPage() {
           <ProCard title="Recent activity" bodyStyle={{ padding: "0 20px" }}>
             <List
               className="activity-list"
-              dataSource={activities}
+              loading={dashboardLoading}
+              locale={{ emptyText: <Empty description="No activity recorded yet" /> }}
+              dataSource={dashboard?.activities ?? []}
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta
-                    avatar={<Avatar>{item.actor.split(" ").map((part) => part[0]).join("").slice(0, 2)}</Avatar>}
+                    avatar={<Avatar>{initials(item.actor)}</Avatar>}
                     title={
                       <span>
-                        <strong>{item.actor}</strong> {item.action}
+                        <strong>{item.actor}</strong>{" "}
+                        {actionLabels[item.action] ?? item.action.toLowerCase()}
                       </span>
                     }
                     description={
                       <>
-                        <Typography.Text ellipsis>{item.resource}</Typography.Text>
-                        <Typography.Text type="secondary">{item.at}</Typography.Text>
+                        <Typography.Text ellipsis>
+                          {item.resource}
+                        </Typography.Text>
+                        <Typography.Text type="secondary">
+                          {formatActivityTime(item.timestamp)}
+                        </Typography.Text>
                       </>
                     }
                   />
@@ -104,16 +173,29 @@ export function DashboardPage() {
           <ProCard title="Workspace storage">
             <div className="storage-summary">
               <Space align="center" size={12}>
-                <span className="storage-icon"><CloudServerOutlined /></span>
+                <span className="storage-icon">
+                  <CloudServerOutlined />
+                </span>
                 <div>
-                  <Typography.Text strong>68 GB used</Typography.Text>
-                  <Typography.Text type="secondary">of 100 GB available</Typography.Text>
+                  <Typography.Text strong>
+                    {formatBytes(dashboard?.storage.usedBytes ?? 0)} used
+                  </Typography.Text>
+                  <Typography.Text type="secondary">
+                    of {formatBytes(dashboard?.storage.quotaBytes ?? 0)} available
+                  </Typography.Text>
                 </div>
               </Space>
-              <Progress percent={68} showInfo={false} />
+              <Progress
+                percent={dashboard?.storage.percent ?? 0}
+                showInfo={false}
+              />
               <div className="storage-legend">
-                <span>Documents 52 GB</span>
-                <span>Versions 16 GB</span>
+                <span>
+                  Documents {formatBytes(dashboard?.storage.documentsBytes ?? 0)}
+                </span>
+                <span>
+                  Versions {formatBytes(dashboard?.storage.versionsBytes ?? 0)}
+                </span>
               </div>
             </div>
           </ProCard>
@@ -121,4 +203,28 @@ export function DashboardPage() {
       </div>
     </PageContainer>
   );
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatActivityTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const unit = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  return `${(bytes / 1024 ** unit).toFixed(unit > 2 ? 1 : 0)} ${units[unit]}`;
 }

@@ -1,19 +1,27 @@
 import { CloudServerOutlined, SafetyCertificateOutlined } from "@ant-design/icons";
 import { Progress, Space, Tooltip, Typography } from "antd";
+import { useDashboard } from "@/hooks/useDashboard";
 
 interface SidebarProps {
   collapsed: boolean;
 }
 
 export function Sidebar({ collapsed }: SidebarProps) {
+  const { data } = useDashboard();
+  const storage = data?.storage;
+  const percent = storage?.percent ?? 0;
+  const storageLabel = storage
+    ? `${formatBytes(storage.usedBytes)} of ${formatBytes(storage.quotaBytes)} used`
+    : "Storage unavailable";
+
   if (collapsed) {
     return (
-      <Tooltip title="Storage: 68 GB of 100 GB used" placement="right">
+      <Tooltip title={storageLabel} placement="right">
         <div className="sidebar-storage-collapsed" aria-label="Storage usage">
           <CloudServerOutlined />
           <Progress
             type="circle"
-            percent={68}
+            percent={percent}
             size={30}
             showInfo={false}
             strokeWidth={8}
@@ -30,14 +38,24 @@ export function Sidebar({ collapsed }: SidebarProps) {
           <CloudServerOutlined />
           <Typography.Text strong>Storage</Typography.Text>
         </Space>
-        <Typography.Text type="secondary">68%</Typography.Text>
+        <Typography.Text type="secondary">{percent}%</Typography.Text>
       </div>
-      <Progress percent={68} showInfo={false} size="small" />
-      <Typography.Text type="secondary">68 GB of 100 GB used</Typography.Text>
+      <Progress percent={percent} showInfo={false} size="small" />
+      <Typography.Text type="secondary">{storageLabel}</Typography.Text>
       <div className="sidebar-compliance">
         <SafetyCertificateOutlined />
         <Typography.Text type="secondary">Enterprise protected</Typography.Text>
       </div>
     </div>
   );
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const unit = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  );
+  return `${(bytes / 1024 ** unit).toFixed(unit > 2 ? 1 : 0)} ${units[unit]}`;
 }

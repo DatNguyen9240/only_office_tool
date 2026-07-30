@@ -120,7 +120,7 @@ export function LoginPage() {
             className="login-form"
             layout="vertical"
             requiredMark={false}
-            initialValues={{ remember: true, email: "anika.verma@meridian.example" }}
+            initialValues={{ remember: true }}
             onFinish={signIn}
           >
             {error && (
@@ -162,7 +162,9 @@ export function LoginPage() {
               <Form.Item name="remember" valuePropName="checked" noStyle>
                 <Checkbox>{t("login.remember")}</Checkbox>
               </Form.Item>
-              <Button type="link">{t("login.forgot")}</Button>
+              <Button type="link" disabled title="Not available yet">
+                {t("login.forgot")}
+              </Button>
             </div>
             <Button
               className="login-submit"
@@ -178,6 +180,8 @@ export function LoginPage() {
           <Button
             className="login-sso-button"
             icon={<SafetyCertificateOutlined />}
+            disabled
+            title="SSO is not configured"
             block
           >
             {t("login.sso")}
@@ -189,7 +193,7 @@ export function LoginPage() {
         </div>
         <Typography.Paragraph type="secondary" className="login-help">
           {t("login.needAccess")}{" "}
-          <Button type="link">{t("login.contactAdmin")}</Button>
+          <Typography.Text>{t("login.contactAdmin")}</Typography.Text>
         </Typography.Paragraph>
       </section>
     </main>
