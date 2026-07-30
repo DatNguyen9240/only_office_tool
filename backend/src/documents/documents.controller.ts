@@ -9,8 +9,11 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { Response } from "express";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
@@ -45,6 +48,16 @@ export class DocumentsController {
       search,
       limit,
     );
+  }
+
+  @Post("upload")
+  @UseInterceptors(FileInterceptor("file"))
+  upload(
+    @UploadedFile() file: { originalname: string; buffer: Buffer; mimetype: string; size: number },
+    @Body("folderId") folderId: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.uploadDocument(file, folderId, user);
   }
 
   @Get(":id")

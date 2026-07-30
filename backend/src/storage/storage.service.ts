@@ -111,6 +111,26 @@ export class StorageService {
     );
   }
 
+  async putObject(objectKey: string, buffer: Buffer, contentType: string) {
+    if (!this.configured()) return;
+    await this.internalClient.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        Body: buffer,
+        ContentType: contentType,
+      }),
+    );
+  }
+
+  async getObjectStream(objectKey: string) {
+    this.ensureConfigured();
+    const response = await this.internalClient.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: objectKey }),
+    );
+    return response.Body;
+  }
+
   private ensureConfigured() {
     if (!this.configured()) {
       throw new ServiceUnavailableException("Object storage is not configured");

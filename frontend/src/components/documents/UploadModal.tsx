@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { InboxOutlined } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   App,
   Button,
@@ -10,9 +12,9 @@ import {
   type UploadFile,
 } from "antd";
 import type { UploadChangeParam } from "antd/es/upload";
-import { useState } from "react";
 import { folders } from "@/data/sampleData";
-import { useI18n } from "@/i18n";
+import { translateApiError, useI18n } from "@/i18n";
+import { apiRequest, isApiConfigured } from "@/lib/api";
 
 interface UploadModalProps {
   open: boolean;
@@ -21,7 +23,8 @@ interface UploadModalProps {
 
 export function UploadModal({ open, onClose }: UploadModalProps) {
   const { message } = App.useApp();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
+  const queryClient = useQueryClient();
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
@@ -32,14 +35,50 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
       message.warning(t("upload.selectOne"));
       return;
     }
+
+    const folderId = form.getFieldValue("folderId");
     setSubmitting(true);
-    window.setTimeout(() => {
-      setSubmitting(false);
+
+    try {
+      if (isApiConfigured) {
+        for (const fileItem of files) {
+          const originFile = fileItem.originFileObj;
+          if (!originFile) continue;
+
+          const formData = new FormData();
+          formData.append("file", originFile);
+          if (folderId && folderId !== "all") {
+            formData.append("folderId", folderId);
+          }
+
+          // Use fetch directly for FormData to avoid default JSON content-type header
+          const stored = localStorage.getItem("meridian-auth");
+          const token = stored ? JSON.parse(stored).state?.accessToken : "";
+          const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+
+          const res = await fetch(`${apiBase}/documents/upload`, {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            body: formData,
+          });
+
+          if (!res.ok) {
+            throw new Error(`Upload failed (${res.status})`);
+          }
+        }
+        queryClient.invalidateQueries({ queryKey: ["documents"] });
+      }
+
+      message.success(t("upload.success", { count: files.length }));
       setFiles([]);
       form.resetFields();
-      message.success(t("upload.success", { count: files.length }));
       onClose();
-    }, 650);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Upload failed";
+      message.error(translateApiError(msg, locale));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

@@ -15,6 +15,8 @@ import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 
+import { StorageService } from "../storage/storage.service";
+
 type DocumentScope = "all" | "shared" | "trash";
 
 const publicType = (value: string): PublicDocumentType =>
@@ -45,6 +47,7 @@ export class DocumentsService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async list(
@@ -249,11 +252,76 @@ export class DocumentsService {
     };
   }
 
+  async uploadDocument(
+    file: { originalname: string; buffer: Buffer; mimetype: string; size: number },
+    folderId: string | undefined,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    const ext = file.originalname.split(".").pop()?.toLowerCase() || "docx";
+
+    const document = await this.prisma.document.create({
+      data: {
+        name: file.originalname,
+        type: ext.toUpperCase(),
+        mimeType: file.mimetype,
+        status: DocumentStatus.READY,
+        ownerId: user.id,
+        folderId: folderId && folderId !== "all" ? folderId : null,
+        versions: {
+          create: {
+            version: 1,
+            storageKey: `documents/${user.id}/${Date.now()}_${file.originalname}`,
+            sizeBytes: BigInt(file.size),
+            createdById: user.id,
+          },
+        },
+      },
+      include: this.publicInclude(user),
+    });
+
+    const storageKey = document.versions[0]?.storageKey;
+    if (storageKey) {
+      try {
+        await this.storage.putObject(storageKey, file.buffer, file.mimetype);
+      } catch (err) {
+        console.warn("[Storage] PutObject failed:", err);
+      }
+    }
+
+    return this.toPublicItem(document, user.id);
+  }
+
   async downloadFile(id: string) {
     const document = await this.prisma.document.findUnique({
       where: { id },
+      include: {
+        versions: {
+          orderBy: { version: "desc" },
+          take: 1,
+        },
+      },
     });
     if (!document) throw new NotFoundException("Document not found");
+
+    const storageKey = document.versions[0]?.storageKey;
+    if (storageKey) {
+      try {
+        const stream = await this.storage.getObjectStream(storageKey);
+        if (stream) {
+          // Convert stream to buffer
+          const chunks: Uint8Array[] = [];
+          for await (const chunk of stream as AsyncIterable<Uint8Array>) {
+            chunks.push(chunk);
+          }
+          return {
+            filename: document.name,
+            buffer: Buffer.concat(chunks),
+          };
+        }
+      } catch (err) {
+        console.warn("[Storage] Download stream failed, using fallback:", err);
+      }
+    }
 
     return {
       filename: document.name,
@@ -265,7 +333,46 @@ export class DocumentsService {
     console.log(`[ONLYOFFICE Callback] Document ${id}:`, body);
     // ONLYOFFICE status 2 = Document is ready for saving
     if (body.status === 2 && typeof body.url === "string") {
-      console.log(`[ONLYOFFICE Callback] Saving new version from ${body.url}`);
+      try {
+        const response = await fetch(body.url);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+
+          const lastVersion = await this.prisma.documentVersion.findFirst({
+            where: { documentId: id },
+            orderBy: { version: "desc" },
+          });
+
+          const nextVersionNumber = (lastVersion?.version ?? 0) + 1;
+          const storageKey = `documents/${id}/v${nextVersionNumber}_${Date.now()}`;
+
+          await this.storage.putObject(
+            storageKey,
+            buffer,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          );
+
+          await this.prisma.documentVersion.create({
+            data: {
+              documentId: id,
+              version: nextVersionNumber,
+              storageKey,
+              sizeBytes: BigInt(buffer.length),
+              createdById: lastVersion?.createdById || id,
+            },
+          });
+
+          await this.prisma.document.update({
+            where: { id },
+            data: { updatedAt: new Date() },
+          });
+
+          console.log(`[ONLYOFFICE Callback] Saved version ${nextVersionNumber} for document ${id}`);
+        }
+      } catch (err) {
+        console.error(`[ONLYOFFICE Callback] Failed to save edited file:`, err);
+      }
     }
     return { error: 0 };
   }

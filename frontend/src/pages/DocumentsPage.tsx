@@ -14,12 +14,15 @@ import {
   Drawer,
   Dropdown,
   Grid,
+  Input,
+  Modal,
   Segmented,
   Select,
   Typography,
 } from "antd";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
 import { FileCardGridSkeleton } from "@/components/common/LoadingSkeletons";
 import { FileCard } from "@/components/documents/FileCard";
@@ -31,6 +34,8 @@ import { UploadModal } from "@/components/documents/UploadModal";
 import { VersionHistoryDrawer } from "@/components/documents/VersionHistoryDrawer";
 import { folders } from "@/data/sampleData";
 import { useDocuments } from "@/hooks/useDocuments";
+import { translateApiError, useI18n } from "@/i18n";
+import { apiRequest, isApiConfigured } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
 import type { DocumentItem } from "@share";
 
@@ -41,14 +46,44 @@ interface DocumentsPageProps {
 export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const { locale } = useI18n();
+  const queryClient = useQueryClient();
   const screens = Grid.useBreakpoint();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [createFolderOpen, setCreateFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const [shareDocument, setShareDocument] = useState<DocumentItem>();
   const [versionDocument, setVersionDocument] = useState<DocumentItem>();
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
   const { data = [], isLoading } = useDocuments(scope);
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return;
+    setCreatingFolder(true);
+    try {
+      if (isApiConfigured) {
+        await apiRequest("/folders", {
+          method: "POST",
+          body: JSON.stringify({
+            name: newFolderName.trim(),
+            parentId: selectedFolderId !== "all" ? selectedFolderId : undefined,
+          }),
+        });
+        queryClient.invalidateQueries({ queryKey: ["folders"] });
+      }
+      message.success(`Đã tạo thư mục "${newFolderName}"`);
+      setNewFolderName("");
+      setCreateFolderOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Tạo thư mục thất bại";
+      message.error(translateApiError(msg, locale));
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
   const {
     selectedFolderId,
     setSelectedFolderId,
@@ -102,8 +137,12 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       title={title}
       subTitle={subtitle}
       extra={[
-        <Button key="folder" icon={<FolderAddOutlined />}>
-          New folder
+        <Button
+          key="folder"
+          icon={<FolderAddOutlined />}
+          onClick={() => setCreateFolderOpen(true)}
+        >
+          Thư mục mới
         </Button>,
         <Dropdown
           key="upload"
@@ -233,6 +272,24 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           onVersions={() => setVersionDocument(selectedDocument)}
         />
       </Drawer>
+      <Modal
+        destroyOnHidden
+        open={createFolderOpen}
+        title="Tạo thư mục mới"
+        onCancel={() => setCreateFolderOpen(false)}
+        onOk={handleCreateFolder}
+        confirmLoading={creatingFolder}
+        okText="Tạo thư mục"
+        cancelText="Hủy"
+      >
+        <Input
+          placeholder="Nhập tên thư mục..."
+          value={newFolderName}
+          onChange={(e) => setNewFolderName(e.target.value)}
+          onPressEnter={handleCreateFolder}
+          autoFocus
+        />
+      </Modal>
       <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
       <SharePermissionModal
         open={Boolean(shareDocument)}
