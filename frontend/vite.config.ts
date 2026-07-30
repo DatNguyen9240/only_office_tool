@@ -15,6 +15,10 @@ export default defineConfig({
     // Named groups keep antd/icons/pro-components as single chunks so rolldown
     // never splits their internal factory-registration pairs across boundaries
     // (which caused "a is not a function" when maxSize was also set on them).
+    // antd is ~1 334 kB pre-gzip but only ~413 kB gzipped — well within browser
+    // limits and cached after first visit. Raise the warning threshold so we still
+    // catch genuine unexpected bloat in app code (threshold sits just above antd).
+    chunkSizeWarningLimit: 1_400,
     rolldownOptions: {
       output: {
         codeSplitting: {
