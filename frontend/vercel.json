@@ -1,21 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/proxy.js": {
-      "maxDuration": 10
-    }
-  },
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "missing": [
-        {
-          "type": "query",
-          "key": "proxied"
-        }
-      ],
-      "destination": "/api/proxy?path=:path*&proxied=true"
-    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
