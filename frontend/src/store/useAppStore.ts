@@ -33,7 +33,7 @@ export const useAppStore = create<AppState>()(
       selectedFolderId: "all",
       previewOpen: true,
       themeMode: "system",
-      locale: "en",
+      locale: "vi",
       setCollapsed: (collapsed) => set({ collapsed }),
       setMobileNavOpen: (mobileNavOpen) => set({ mobileNavOpen }),
       setViewMode: (viewMode) => set({ viewMode }),
