@@ -14,3 +14,5 @@ services:
       - "5000:3000"
     init: true
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
