@@ -100,16 +100,16 @@ export class OnlyOfficeService implements OnModuleInit {
     const onlyofficeServerUrl = this.getRequiredConfig("ONLYOFFICE_SERVER_URL");
     const jwtSecret = this.getRequiredConfig("ONLYOFFICE_JWT_SECRET");
 
-    const currentVersion = await this.prisma.documentVersion.findFirst({
-      where: {
-        documentId: document.id,
-        ...(document.currentVersionId
-          ? { id: document.currentVersionId }
-          : {}),
-      },
-      orderBy: { version: "desc" },
-      select: { objectKey: true },
-    });
+    const currentVersion = document.currentVersionId
+      ? await this.prisma.documentVersion.findUnique({
+          where: { id: document.currentVersionId },
+          select: { objectKey: true },
+        })
+      : await this.prisma.documentVersion.findFirst({
+          where: { documentId: document.id },
+          orderBy: { version: "desc" },
+          select: { objectKey: true },
+        });
 
     if (!currentVersion) {
       throw new NotFoundException("Document has no uploaded version");
@@ -264,12 +264,14 @@ export class OnlyOfficeService implements OnModuleInit {
         return created;
       });
     } catch (dbError) {
-      await this.storage.deleteObjects([objectKey]).catch((storageErr) => {
+      try {
+        await this.storage.deleteObjects([objectKey]);
+      } catch (storageErr) {
         this.logger.error(
           `[Compensation Rollback Error] Failed to delete orphan storage object ${objectKey}`,
           storageErr,
         );
-      });
+      }
       throw dbError;
     }
 

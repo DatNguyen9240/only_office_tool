@@ -2,9 +2,10 @@ import { Type } from "class-transformer";
 import {
   IsArray,
   IsInt,
-  IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
+  ValidateIf,
 } from "class-validator";
 
 export class OnlyOfficeUserDto {
@@ -21,8 +22,9 @@ export class OnlyOfficeCallbackDto {
   @IsInt()
   status!: number;
 
-  @IsOptional()
+  @ValidateIf((o: OnlyOfficeCallbackDto) => o.status === 2 || o.status === 6)
   @IsString()
+  @IsUrl({ require_tld: false }, { message: "ONLYOFFICE callback URL must be a valid URL" })
   url?: string;
 
   @IsOptional()
