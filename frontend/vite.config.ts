@@ -12,34 +12,34 @@ export default defineConfig({
     port: 5173,
   },
   build: {
-    // Keep the initial route small and cache large UI dependencies separately.
-    // Vite 8 uses Rolldown's codeSplitting instead of Rollup manualChunks.
+    // Named groups keep antd/icons/pro-components as single chunks so rolldown
+    // never splits their internal factory-registration pairs across boundaries
+    // (which caused "a is not a function" when maxSize was also set on them).
     rolldownOptions: {
       output: {
         codeSplitting: {
           groups: [
             {
+              // Keep antd as ONE chunk — no maxSize; splitting it mid-init breaks things.
               name: "antd",
               test: /node_modules[\\/]antd[\\/]/,
-              maxSize: 260_000,
+              priority: 40,
+            },
+            {
+              name: "antd-icons",
+              test: /node_modules[\\/]@ant-design[\\/]icons[\\/]/,
+              priority: 35,
+            },
+            {
+              name: "antd-pro",
+              test: /node_modules[\\/]@ant-design[\\/]pro-components[\\/]/,
               priority: 30,
             },
             {
-              name: "pro-components",
-              test: /node_modules[\\/]@ant-design[\\/]pro-components[\\/]/,
-              maxSize: 220_000,
-              priority: 25,
-            },
-            {
-              name: "icons",
-              test: /node_modules[\\/]@ant-design[\\/]icons[\\/]/,
-              maxSize: 180_000,
-              priority: 20,
-            },
-            {
+              // Generic vendor — maxSize is safe here as there are no ordered-init deps.
               name: "vendor",
               test: /node_modules[\\/]/,
-              maxSize: 220_000,
+              maxSize: 250_000,
               priority: 10,
             },
           ],
