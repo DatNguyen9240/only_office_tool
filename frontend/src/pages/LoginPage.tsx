@@ -6,6 +6,8 @@ import {
   SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import {
+  Alert,
+  App,
   Button,
   Checkbox,
   Divider,
@@ -15,20 +17,43 @@ import {
   Typography,
 } from "antd";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import loginArchive from "@/assets/login-archive.jpg";
 import { PreferenceControls } from "@/components/common/PreferenceControls";
 import { useI18n } from "@/i18n";
+import { isApiConfigured } from "@/lib/api";
+import { useAuthStore } from "@/store/useAuthStore";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
+  const { message } = App.useApp();
+  const login = useAuthStore((state) => state.login);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string>();
 
-  const signIn = async () => {
+  const signIn = async (values: {
+    email: string;
+    password: string;
+    remember?: boolean;
+  }) => {
     setSubmitting(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 450));
-    navigate("/workspace");
+    setError(undefined);
+    try {
+      if (!isApiConfigured) {
+        throw new Error("Set VITE_API_URL to connect to the Meridian API.");
+      }
+      await login(values.email, values.password, values.remember !== false);
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from;
+      navigate(from?.pathname || "/workspace", { replace: true });
+    } catch (cause) {
+      const nextError = cause instanceof Error ? cause.message : "Sign in failed";
+      setError(nextError);
+      message.error(nextError);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -97,6 +122,16 @@ export function LoginPage() {
             initialValues={{ remember: true, email: "anika.verma@meridian.example" }}
             onFinish={signIn}
           >
+            {error && (
+              <Alert
+                type="error"
+                showIcon
+                closable
+                message={error}
+                onClose={() => setError(undefined)}
+                style={{ marginBottom: 16 }}
+              />
+            )}
             <Form.Item
               label={t("login.email")}
               name="email"

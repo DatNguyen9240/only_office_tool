@@ -5,6 +5,7 @@ import {
   type RouteSkeletonVariant,
 } from "@/components/common/LoadingSkeletons";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PublicOnly, RequireAuth, RequireRole } from "@/app/routeGuards";
 
 const LoginPage = lazy(() =>
   import("@/pages/LoginPage").then((module) => ({ default: module.LoginPage })),
@@ -41,27 +42,60 @@ const load = (element: ReactNode, variant: RouteSkeletonVariant = "content") => 
 export const router = createBrowserRouter([
   {
     path: "/login",
-    element: load(<LoginPage />, "login"),
+    element: load(
+      <PublicOnly>
+        <LoginPage />
+      </PublicOnly>,
+      "login",
+    ),
   },
   {
     path: "/editor/:id",
-    element: load(<EditorPage />, "editor"),
+    element: load(
+      <RequireAuth>
+        <EditorPage />
+      </RequireAuth>,
+      "editor",
+    ),
   },
   {
     path: "/workspace",
-    element: load(<WorkspacePage />, "workspace"),
+    element: load(
+      <RequireAuth>
+        <WorkspacePage />
+      </RequireAuth>,
+      "workspace",
+    ),
   },
   {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <RequireAuth>
+        <AppLayout />
+      </RequireAuth>
+    ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: load(<DashboardPage />) },
       { path: "documents", element: load(<DocumentsPage />) },
       { path: "shared", element: load(<DocumentsPage scope="shared" />) },
       { path: "trash", element: load(<TrashPage />) },
-      { path: "admin/users", element: load(<UsersPage />) },
-      { path: "admin/audit", element: load(<AuditPage />) },
+      {
+        path: "admin/users",
+        element: load(
+          <RequireRole roles={["ADMINISTRATOR"]}>
+            <UsersPage />
+          </RequireRole>,
+        ),
+      },
+      {
+        path: "admin/audit",
+        element: load(
+          <RequireRole roles={["ADMINISTRATOR"]}>
+            <AuditPage />
+          </RequireRole>,
+        ),
+      },
       { path: "*", element: load(<NotFoundPage />) },
     ],
   },

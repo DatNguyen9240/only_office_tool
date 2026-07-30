@@ -7,10 +7,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProConfigProvider, enUSIntl, viVNIntl } from "@ant-design/pro-components";
 import { I18nProvider } from "@/i18n";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { createAppTheme } from "@/app/theme";
+import { AuthBootstrap } from "@/app/AuthBootstrap";
 
 export function AppProviders({ children }: PropsWithChildren) {
   const { locale, themeMode } = useAppStore();
+  const authUserId = useAuthStore((state) => state.user?.id);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
@@ -40,12 +43,18 @@ export function AppProviders({ children }: PropsWithChildren) {
     document.documentElement.lang = locale;
   }, [dark, locale]);
 
+  useEffect(() => {
+    queryClient.removeQueries({ queryKey: ["documents"] });
+  }, [authUserId, queryClient]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <I18nProvider locale={locale}>
         <ConfigProvider theme={currentTheme} locale={locale === "vi" ? viVN : enUS}>
           <ProConfigProvider intl={locale === "vi" ? viVNIntl : enUSIntl}>
-            <AntApp>{children}</AntApp>
+            <AntApp>
+              <AuthBootstrap>{children}</AuthBootstrap>
+            </AntApp>
           </ProConfigProvider>
         </ConfigProvider>
       </I18nProvider>

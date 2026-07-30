@@ -8,6 +8,7 @@ import { Avatar, Badge, Button, Dropdown, Input, Space, Tooltip } from "antd";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
 
 const routeLabels: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -22,6 +23,8 @@ export function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const collapsed = useAppStore((state) => state.collapsed);
   const setCollapsed = useAppStore((state) => state.setCollapsed);
   const routeLabel = routeLabels[location.pathname] ?? "Meridian DMS";
@@ -61,16 +64,29 @@ export function Header() {
               { key: "profile", label: "Profile and settings" },
               { key: "security", label: "Security" },
               { type: "divider" },
-              { key: "signout", label: "Sign out", onClick: () => navigate("/login") },
+              {
+                key: "signout",
+                label: "Sign out",
+                onClick: () => {
+                  void logout().then(() => navigate("/login", { replace: true }));
+                },
+              },
             ],
           }}
           trigger={["click"]}
         >
           <button className="account-trigger" aria-label="Open account menu">
-            <Avatar size={32}>AV</Avatar>
+            <Avatar size={32}>
+              {user?.name
+                ?.split(" ")
+                .map((part) => part[0])
+                .join("")
+                .slice(0, 2)
+                .toUpperCase() || "U"}
+            </Avatar>
             <span className="account-copy">
-              <strong>Anika Verma</strong>
-              <small>Operations manager</small>
+              <strong>{user?.name || "User"}</strong>
+              <small>{user?.role || "Employee"}</small>
             </span>
           </button>
         </Dropdown>

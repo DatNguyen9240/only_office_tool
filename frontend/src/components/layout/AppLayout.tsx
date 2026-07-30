@@ -10,10 +10,11 @@ import { ProLayout, type ProLayoutProps } from "@ant-design/pro-components";
 import { useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
+import { useAuthStore } from "@/store/useAuthStore";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 
-const route: ProLayoutProps["route"] = {
+const baseRoute = {
   path: "/",
   children: [
     { path: "/dashboard", name: "Dashboard", icon: <DashboardOutlined /> },
@@ -30,13 +31,21 @@ const route: ProLayoutProps["route"] = {
       ],
     },
   ],
-};
+} satisfies NonNullable<ProLayoutProps["route"]>;
 
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const collapsed = useAppStore((state) => state.collapsed);
   const setCollapsed = useAppStore((state) => state.setCollapsed);
+  const user = useAuthStore((state) => state.user);
+  const route = useMemo<ProLayoutProps["route"]>(() => {
+    if (user?.role === "ADMINISTRATOR") return baseRoute;
+    return {
+      ...baseRoute,
+      children: baseRoute.children?.filter((item) => item.path !== "/admin"),
+    };
+  }, [user?.role]);
 
   const selectedKeys = useMemo(() => [location.pathname], [location.pathname]);
   const handleMenuClick = ({ key }: { key: string }) => navigate(key);
