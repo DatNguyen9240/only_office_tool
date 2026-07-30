@@ -98,10 +98,11 @@ model Document {
   folderId         String?
   ownerId          String
   starred          Boolean              @default(false)
-  currentVersionId String?
+  currentVersionId String?              @unique
   folder           Folder?              @relation(fields: [folderId], references: [id])
   owner            User                 @relation("DocumentOwner", fields: [ownerId], references: [id])
-  versions         DocumentVersion[]
+  currentVersion   DocumentVersion?     @relation("CurrentDocumentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions         DocumentVersion[]    @relation("DocumentVersions")
   permissions      DocumentPermission[]
   shareLinks       ShareLink[]
   createdAt        DateTime             @default(now())
@@ -125,7 +126,8 @@ model DocumentVersion {
   checksum     String?
   note         String?
   authorId     String
-  document     Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document     Document @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
+  currentFor   Document? @relation("CurrentDocumentVersion")
   author       User     @relation("VersionAuthor", fields: [authorId], references: [id])
   createdAt    DateTime @default(now())
 

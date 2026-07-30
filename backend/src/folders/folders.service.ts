@@ -43,7 +43,9 @@ export class FoldersService {
 
   async update(id: string, input: UpdateFolderDto, ownerId: string) {
     await this.ensureFolder(id, ownerId);
-    if (input.parentId) await this.ensureFolder(input.parentId, ownerId);
+    if (input.parentId !== undefined) {
+      await this.ensureValidParent(id, input.parentId, ownerId);
+    }
     const folder = await this.prisma.folder.update({
       where: { id },
       data: {
@@ -79,5 +81,32 @@ export class FoldersService {
       select: { id: true },
     });
     if (!folder) throw new NotFoundException("Folder not found");
+  }
+
+  private async ensureValidParent(
+    folderId: string,
+    parentId: string | null,
+    ownerId: string,
+  ) {
+    if (!parentId) return;
+    if (parentId === folderId) {
+      throw new ConflictException("A folder cannot be its own parent");
+    }
+
+    let currentId: string | null = parentId;
+    const visited = new Set<string>();
+    while (currentId) {
+      if (currentId === folderId || visited.has(currentId)) {
+        throw new ConflictException("Folder move would create a cycle");
+      }
+      visited.add(currentId);
+      const current: { parentId: string | null } | null =
+        await this.prisma.folder.findFirst({
+          where: { id: currentId, ownerId },
+          select: { parentId: true },
+        });
+      if (!current) throw new NotFoundException("Parent folder not found");
+      currentId = current.parentId;
+    }
   }
 }

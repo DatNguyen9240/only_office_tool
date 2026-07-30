@@ -1,6 +1,7 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
+  DeleteObjectsCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -112,13 +113,28 @@ export class StorageService {
   }
 
   async putObject(objectKey: string, buffer: Buffer, contentType: string) {
-    if (!this.configured()) return;
+    this.ensureConfigured();
     await this.internalClient.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: objectKey,
         Body: buffer,
         ContentType: contentType,
+      }),
+    );
+  }
+
+  async deleteObjects(objectKeys: string[]) {
+    const uniqueKeys = [...new Set(objectKeys)].filter(Boolean);
+    if (!uniqueKeys.length) return;
+    this.ensureConfigured();
+    await this.internalClient.send(
+      new DeleteObjectsCommand({
+        Bucket: this.bucket,
+        Delete: {
+          Objects: uniqueKeys.map((Key) => ({ Key })),
+          Quiet: true,
+        },
       }),
     );
   }

@@ -51,6 +51,14 @@ async function request(
 }
 
 async function refreshTokens(): Promise<AuthTokensResponse | undefined> {
+  return refreshPromise ??= performRefresh().finally(() => {
+    refreshPromise = undefined;
+  });
+}
+
+let refreshPromise: Promise<AuthTokensResponse | undefined> | undefined;
+
+async function performRefresh(): Promise<AuthTokensResponse | undefined> {
   const stored = loadStoredAuth();
   if (!stored?.refreshToken) return undefined;
 
@@ -68,6 +76,11 @@ async function refreshTokens(): Promise<AuthTokensResponse | undefined> {
   const tokens = (await response.json()) as AuthTokensResponse;
   updateStoredTokens(tokens);
   return tokens;
+}
+
+async function parseSuccess<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
+  return (await response.json()) as T;
 }
 
 export async function apiRequest<T>(
@@ -94,13 +107,12 @@ export async function apiRequest<T>(
       if (!retry.ok) {
         throw new ApiError(retry.status, await parseError(retry));
       }
-      return (await retry.json()) as T;
+      return parseSuccess<T>(retry);
     }
   }
 
   if (!response.ok) {
     throw new ApiError(response.status, await parseError(response));
   }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  return parseSuccess<T>(response);
 }

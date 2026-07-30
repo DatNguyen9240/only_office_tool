@@ -1,6 +1,8 @@
 import {
   EllipsisOutlined,
   HistoryOutlined,
+  DownloadOutlined,
+  DeleteOutlined,
   ShareAltOutlined,
 } from "@ant-design/icons";
 import { Button, Dropdown, Space, Typography } from "antd";
@@ -14,6 +16,8 @@ interface FileCardProps {
   onOpen?: () => void;
   onShare?: () => void;
   onVersions?: () => void;
+  onDownload?: () => void;
+  onDelete?: () => void;
 }
 
 export function FileCard({
@@ -23,6 +27,8 @@ export function FileCard({
   onOpen,
   onShare,
   onVersions,
+  onDownload,
+  onDelete,
 }: FileCardProps) {
   return (
     <article
@@ -51,6 +57,19 @@ export function FileCard({
                 icon: <HistoryOutlined />,
                 label: "Version history",
                 onClick: onVersions,
+              },
+              {
+                key: "download",
+                icon: <DownloadOutlined />,
+                label: "Download",
+                onClick: onDownload,
+              },
+              {
+                key: "delete",
+                danger: true,
+                icon: <DeleteOutlined />,
+                label: "Move to trash",
+                onClick: onDelete,
               },
             ],
           }}

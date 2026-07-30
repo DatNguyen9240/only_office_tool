@@ -1,20 +1,51 @@
 import { DeleteOutlined, InfoCircleOutlined } from "@ant-design/icons";
+import { useQueryClient } from "@tanstack/react-query";
 import { PageContainer } from "@ant-design/pro-components";
 import { Alert, App, Button, Popconfirm } from "antd";
-import { useState } from "react";
 import { FileTable } from "@/components/documents/FileTable";
 import { useDocuments } from "@/hooks/useDocuments";
+import { translateApiError, useI18n } from "@/i18n";
+import { apiRequest } from "@/lib/api";
 import type { DocumentItem } from "@share";
 
 export function TrashPage() {
   const { message } = App.useApp();
+  const { locale } = useI18n();
+  const queryClient = useQueryClient();
   const { data = [], isLoading } = useDocuments("trash");
-  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
-  const visible = data.filter((item) => !hiddenIds.includes(item.id));
 
-  const remove = (document: DocumentItem, action: "restored" | "deleted") => {
-    setHiddenIds((ids) => [...ids, document.id]);
-    message.success(`${document.name} ${action}`);
+  const run = async (
+    document: DocumentItem,
+    action: "restore" | "delete",
+  ) => {
+    try {
+      await apiRequest(
+        action === "restore"
+          ? `/documents/${document.id}/restore`
+          : `/documents/${document.id}/permanent`,
+        { method: action === "restore" ? "POST" : "DELETE" },
+      );
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      message.success(
+        action === "restore"
+          ? `${document.name} restored`
+          : `${document.name} permanently deleted`,
+      );
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Operation failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
+  const emptyTrash = async () => {
+    try {
+      await apiRequest("/documents?scope=trash", { method: "DELETE" });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      message.success("Trash emptied");
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Empty trash failed";
+      message.error(translateApiError(text, locale));
+    }
   };
 
   return (
@@ -27,10 +58,7 @@ export function TrashPage() {
           key="empty"
           title="Empty trash?"
           description="This permanently deletes every item in Trash."
-          onConfirm={() => {
-            setHiddenIds(data.map((item) => item.id));
-            message.success("Trash emptied");
-          }}
+          onConfirm={emptyTrash}
         >
           <Button danger icon={<DeleteOutlined />}>Empty trash</Button>
         </Popconfirm>,
@@ -45,11 +73,11 @@ export function TrashPage() {
       />
       <section className="trash-table-surface">
         <FileTable
-          documents={visible}
+          documents={data}
           loading={isLoading}
           trash
-          onRestore={(document) => remove(document, "restored")}
-          onDelete={(document) => remove(document, "deleted")}
+          onRestore={(document) => void run(document, "restore")}
+          onDelete={(document) => void run(document, "delete")}
         />
       </section>
     </PageContainer>

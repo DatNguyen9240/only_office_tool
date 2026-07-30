@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import { DownloadOutlined, HistoryOutlined } from "@ant-design/icons";
 import { useQueryClient } from "@tanstack/react-query";
-import { App, Button, Drawer, Popconfirm, Space, Tag, Timeline, Typography } from "antd";
-import { versions as sampleVersions } from "@/data/sampleData";
-import { useI18n } from "@/i18n";
-import { apiRequest, isApiConfigured } from "@/lib/api";
+import {
+  App,
+  Button,
+  Drawer,
+  Popconfirm,
+  Space,
+  Tag,
+  Timeline,
+  Typography,
+} from "antd";
+import { translateApiError, useI18n } from "@/i18n";
+import { apiRequest } from "@/lib/api";
 import type { DocumentItem } from "@share";
 
 interface VersionItem {
@@ -28,48 +36,63 @@ export function VersionHistoryDrawer({
   onClose,
 }: VersionHistoryDrawerProps) {
   const { message } = App.useApp();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const [versionList, setVersionList] = useState<VersionItem[]>([]);
   const [restoring, setRestoring] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!open || !document?.id || !isApiConfigured) {
+    if (!open || !document?.id) {
+      setVersionList([]);
       return;
     }
+    setVersionList([]);
+    setLoading(true);
     apiRequest<VersionItem[]>(`/documents/${document.id}/versions`)
-      .then((data) => setVersionList(data))
-      .catch((err) => console.warn("Failed to fetch versions:", err));
-  }, [open, document?.id]);
+      .then(setVersionList)
+      .catch((error) => {
+        const text =
+          error instanceof Error ? error.message : "Failed to fetch versions";
+        message.error(translateApiError(text, locale));
+      })
+      .finally(() => setLoading(false));
+  }, [document?.id, locale, message, open]);
 
-  const handleRestore = async (versionNum: number) => {
+  const handleRestore = async (version: number) => {
     if (!document?.id) return;
     setRestoring(true);
     try {
-      if (isApiConfigured) {
-        await apiRequest(`/documents/${document.id}/versions/${versionNum}/restore`, {
-          method: "POST",
-        });
-        queryClient.invalidateQueries({ queryKey: ["documents"] });
-        const updated = await apiRequest<VersionItem[]>(`/documents/${document.id}/versions`);
-        setVersionList(updated);
-      }
-      message.success(t("versions.restored", { version: `v${versionNum}.0` }));
-    } catch (err) {
-      console.warn("Restore version failed:", err);
+      await apiRequest(`/documents/${document.id}/versions/${version}/restore`, {
+        method: "POST",
+      });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      const updated = await apiRequest<VersionItem[]>(
+        `/documents/${document.id}/versions`,
+      );
+      setVersionList(updated);
+      message.success(t("versions.restored", { version: `v${version}.0` }));
+    } catch (error) {
+      const text =
+        error instanceof Error ? error.message : "Restore version failed";
+      message.error(translateApiError(text, locale));
     } finally {
       setRestoring(false);
     }
   };
 
-  const displayList = isApiConfigured && versionList.length ? versionList : sampleVersions.map((v, idx) => ({
-    id: v.id,
-    version: sampleVersions.length - idx,
-    versionLabel: v.version,
-    modifiedAt: v.createdAt,
-    author: v.author,
-    size: v.size,
-  }));
+  const downloadVersion = async (version: number) => {
+    if (!document?.id) return;
+    try {
+      const response = await apiRequest<{ url: string }>(
+        `/documents/${document.id}/versions/${version}/download-url`,
+      );
+      window.location.assign(response.url);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Download failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
 
   return (
     <Drawer
@@ -77,21 +100,19 @@ export function VersionHistoryDrawer({
       title={t("history.title")}
       width={420}
       onClose={onClose}
-      extra={
-        <Button size="small" icon={<DownloadOutlined />}>
-          {t("history.downloadAll")}
-        </Button>
-      }
     >
       {document && (
         <div className="drawer-document-heading">
           <Typography.Text strong>{document.name}</Typography.Text>
-          <Typography.Text type="secondary">{displayList.length} phiên bản đã lưu</Typography.Text>
+          <Typography.Text type="secondary">
+            {versionList.length} phiên bản đã lưu
+          </Typography.Text>
         </div>
       )}
       <Timeline
-        items={displayList.map((item, idx) => {
-          const isCurrent = idx === 0;
+        pending={loading}
+        items={versionList.map((item, index) => {
+          const isCurrent = index === 0;
           return {
             color: isCurrent ? "#275dad" : "gray",
             dot: isCurrent ? <HistoryOutlined /> : undefined,
@@ -108,15 +129,27 @@ export function VersionHistoryDrawer({
                 <Typography.Text type="secondary">
                   {item.author}, {item.modifiedAt}, {item.size}
                 </Typography.Text>
-                {!isCurrent && (
-                  <Popconfirm
-                    title={t("versions.restoreTitle")}
-                    description={t("versions.restoreDescription")}
-                    onConfirm={() => handleRestore(item.version)}
+                <Space>
+                  {!isCurrent && (
+                    <Popconfirm
+                      title={t("versions.restoreTitle")}
+                      description={t("versions.restoreDescription")}
+                      onConfirm={() => handleRestore(item.version)}
+                    >
+                      <Button size="small" loading={restoring}>
+                        {t("common.restore")}
+                      </Button>
+                    </Popconfirm>
+                  )}
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={() => void downloadVersion(item.version)}
                   >
-                    <Button size="small" loading={restoring}>{t("common.restore")}</Button>
-                  </Popconfirm>
-                )}
+                    Download
+                  </Button>
+                </Space>
               </div>
             ),
           };

@@ -6,6 +6,8 @@ import {
   EyeOutlined,
   HistoryOutlined,
   LockOutlined,
+  FolderOpenOutlined,
+  StarOutlined,
   ShareAltOutlined,
   UndoOutlined,
 } from "@ant-design/icons";
@@ -29,6 +31,10 @@ interface FileTableProps {
   onVersions?: (document: DocumentItem) => void;
   onDelete?: (document: DocumentItem) => void;
   onRestore?: (document: DocumentItem) => void;
+  onDownload?: (document: DocumentItem) => void;
+  onRename?: (document: DocumentItem) => void;
+  onMove?: (document: DocumentItem) => void;
+  onStar?: (document: DocumentItem) => void;
 }
 
 const statusMap = {
@@ -51,6 +57,10 @@ export function FileTable({
   onVersions,
   onDelete,
   onRestore,
+  onDownload,
+  onRename,
+  onMove,
+  onStar,
 }: FileTableProps) {
   if (loading) {
     return <FileTableSkeleton narrow={narrow} />;
@@ -88,6 +98,24 @@ export function FileTable({
             onClick: () => onSelect?.(record),
           },
           {
+            key: "rename",
+            icon: <EditOutlined />,
+            label: "Rename",
+            onClick: () => onRename?.(record),
+          },
+          {
+            key: "move",
+            icon: <FolderOpenOutlined />,
+            label: "Move",
+            onClick: () => onMove?.(record),
+          },
+          {
+            key: "star",
+            icon: <StarOutlined />,
+            label: record.starred ? "Remove from favorites" : "Add to favorites",
+            onClick: () => onStar?.(record),
+          },
+          {
             key: "share",
             icon: <ShareAltOutlined />,
             label: "Manage access",
@@ -100,7 +128,12 @@ export function FileTable({
             onClick: () => onVersions?.(record),
           },
           { type: "divider" },
-          { key: "download", icon: <DownloadOutlined />, label: "Download" },
+          {
+            key: "download",
+            icon: <DownloadOutlined />,
+            label: "Download",
+            onClick: () => onDownload?.(record),
+          },
           {
             key: "delete",
             danger: true,

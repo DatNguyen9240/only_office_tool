@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { DocumentType, Prisma } from "@prisma/client";
+import { DocumentType } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
@@ -46,7 +47,6 @@ export class FilesService {
       if (!folder) throw new NotFoundException("Folder not found");
     }
 
-    const objectKey = `documents/${user.id}/${randomUUID()}${extension}`;
     const document = await this.prisma.document.create({
       data: {
         name: input.name,
@@ -57,14 +57,17 @@ export class FilesService {
       select: { id: true },
     });
 
-    const upload = await this.storage.createUploadUrl(
-      objectKey,
-      input.contentType,
-    );
-    await this.prisma.document.update({
-      where: { id: document.id },
-      data: { currentVersionId: null },
-    });
+    const objectKey = `documents/${user.id}/${document.id}/${randomUUID()}${extension}`;
+    let upload: Awaited<ReturnType<StorageService["createUploadUrl"]>>;
+    try {
+      upload = await this.storage.createUploadUrl(
+        objectKey,
+        input.contentType,
+      );
+    } catch (error) {
+      await this.prisma.document.delete({ where: { id: document.id } });
+      throw error;
+    }
 
     return {
       documentId: document.id,
@@ -87,8 +90,19 @@ export class FilesService {
       select: { id: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
-    if (!input.objectKey.startsWith(`documents/${document.ownerId}/`)) {
+    if (
+      !input.objectKey.startsWith(
+        `documents/${document.ownerId}/${document.id}/`,
+      )
+    ) {
       throw new BadRequestException("Upload object does not belong to document");
+    }
+    const existingVersion = await this.prisma.documentVersion.findFirst({
+      where: { objectKey: input.objectKey },
+      select: { id: true },
+    });
+    if (existingVersion) {
+      throw new ConflictException("Upload has already been completed");
     }
 
     const head = await this.storage.headObject(input.objectKey);
@@ -139,6 +153,7 @@ export class FilesService {
     const document = await this.prisma.document.findFirst({
       where: {
         id: documentId,
+        deletedAt: null,
         ...(user.role === "ADMINISTRATOR"
           ? {}
           : {
@@ -158,21 +173,25 @@ export class FilesService {
         id: true,
         name: true,
         currentVersionId: true,
-        versions: {
-          orderBy: { version: "desc" },
-          take: 1,
-          select: { objectKey: true },
-        },
       },
     });
     if (!document) throw new NotFoundException("Document not found");
-    const objectKey = document.versions[0]?.objectKey;
-    if (!objectKey) throw new NotFoundException("Document has no uploaded version");
+    const version = await this.prisma.documentVersion.findFirst({
+      where: {
+        documentId,
+        ...(document.currentVersionId
+          ? { id: document.currentVersionId }
+          : {}),
+      },
+      orderBy: { version: "desc" },
+      select: { objectKey: true },
+    });
+    if (!version) throw new NotFoundException("Document has no uploaded version");
 
     return {
       documentId: document.id,
       name: document.name,
-      ...(await this.storage.createDownloadUrl(objectKey)),
+      ...(await this.storage.createDownloadUrl(version.objectKey)),
     };
   }
 }

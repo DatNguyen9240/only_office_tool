@@ -46,7 +46,7 @@ export function LoginPage() {
       }
       await login(values.email, values.password, values.remember !== false);
       const from = (location.state as { from?: { pathname?: string } } | null)?.from;
-      navigate(from?.pathname || "/workspace", { replace: true });
+      navigate(from?.pathname || "/documents", { replace: true });
     } catch (cause) {
       const rawError = cause instanceof Error ? cause.message : "Sign in failed";
       const nextError = translateApiError(rawError, locale);

@@ -32,8 +32,8 @@ import { SearchBar } from "@/components/documents/SearchBar";
 import { SharePermissionModal } from "@/components/documents/SharePermissionModal";
 import { UploadModal } from "@/components/documents/UploadModal";
 import { VersionHistoryDrawer } from "@/components/documents/VersionHistoryDrawer";
-import { folders } from "@/data/sampleData";
 import { useDocuments } from "@/hooks/useDocuments";
+import { useFolders } from "@/hooks/useFolders";
 import { translateApiError, useI18n } from "@/i18n";
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
@@ -58,7 +58,13 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const [shareDocument, setShareDocument] = useState<DocumentItem>();
   const [versionDocument, setVersionDocument] = useState<DocumentItem>();
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [renameDocument, setRenameDocument] = useState<DocumentItem>();
+  const [renameValue, setRenameValue] = useState("");
+  const [moveDocument, setMoveDocument] = useState<DocumentItem>();
+  const [moveFolderId, setMoveFolderId] = useState("all");
   const { data = [], isLoading } = useDocuments(scope);
+  const { data: folders = [] } = useFolders();
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -103,9 +109,10 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             ? true
             : document.folderId === selectedFolderId;
         const queryMatch = document.name.toLowerCase().includes(query.toLowerCase());
-        return folderMatch && queryMatch;
+        const typeMatch = typeFilter === "all" || document.type === typeFilter;
+        return folderMatch && queryMatch && typeMatch;
       }),
-    [data, query, scope, selectedFolderId],
+    [data, query, scope, selectedFolderId, typeFilter],
   );
 
   const selectedDocument = data.find((item) => item.id === selectedDocumentId);
@@ -118,8 +125,58 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       : "Organize, edit, and govern your company documents.";
 
   const openDocument = (document: DocumentItem) => navigate(`/editor/${document.id}`);
-  const removeDocument = (document: DocumentItem) =>
-    message.success(`${document.name} moved to trash`);
+  const removeDocument = async (document: DocumentItem) => {
+    try {
+      await apiRequest(`/documents/${document.id}`, { method: "DELETE" });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      message.success(`${document.name} moved to trash`);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Delete failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
+  const downloadDocument = async (document: DocumentItem) => {
+    try {
+      const response = await apiRequest<{ url: string }>(
+        `/documents/${document.id}/download-url`,
+      );
+      window.location.assign(response.url);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Download failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
+  const patchDocument = async (
+    document: DocumentItem,
+    update: Record<string, unknown>,
+    success: string,
+  ) => {
+    try {
+      await apiRequest(`/documents/${document.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(update),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      message.success(success);
+      return true;
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Update failed";
+      message.error(translateApiError(text, locale));
+      return false;
+    }
+  };
+
+  const toggleStar = async (document: DocumentItem) => {
+    try {
+      await apiRequest(`/documents/${document.id}/star`, { method: "POST" });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Update failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
 
   const folderPanel = (
     <FolderTree
@@ -169,6 +226,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
         <Select
           className="document-type-filter"
           defaultValue="all"
+          value={typeFilter}
           suffixIcon={<FilterOutlined />}
           options={[
             { value: "all", label: "All file types" },
@@ -177,6 +235,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             { value: "pptx", label: "Presentations" },
             { value: "pdf", label: "PDF files" },
           ]}
+          onChange={setTypeFilter}
         />
         <Segmented
           aria-label="Document view"
@@ -220,6 +279,16 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
               onShare={setShareDocument}
               onVersions={setVersionDocument}
               onDelete={removeDocument}
+              onDownload={downloadDocument}
+              onRename={(document) => {
+                setRenameDocument(document);
+                setRenameValue(document.name);
+              }}
+              onMove={(document) => {
+                setMoveDocument(document);
+                setMoveFolderId(document.folderId);
+              }}
+              onStar={(document) => void toggleStar(document)}
             />
           ) : isLoading ? (
             <FileCardGridSkeleton />
@@ -234,6 +303,8 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
                   onOpen={() => openDocument(document)}
                   onShare={() => setShareDocument(document)}
                   onVersions={() => setVersionDocument(document)}
+                  onDownload={() => void downloadDocument(document)}
+                  onDelete={() => void removeDocument(document)}
                 />
               ))}
             </div>
@@ -301,6 +372,60 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
         document={versionDocument}
         onClose={() => setVersionDocument(undefined)}
       />
+      <Modal
+        open={Boolean(renameDocument)}
+        title="Rename document"
+        okText="Rename"
+        onCancel={() => setRenameDocument(undefined)}
+        onOk={async () => {
+          if (!renameDocument || !renameValue.trim()) return;
+          if (
+            await patchDocument(
+              renameDocument,
+              { name: renameValue.trim() },
+              "Document renamed",
+            )
+          ) {
+            setRenameDocument(undefined);
+          }
+        }}
+      >
+        <Input
+          value={renameValue}
+          onChange={(event) => setRenameValue(event.target.value)}
+        />
+      </Modal>
+      <Modal
+        open={Boolean(moveDocument)}
+        title="Move document"
+        okText="Move"
+        onCancel={() => setMoveDocument(undefined)}
+        onOk={async () => {
+          if (!moveDocument) return;
+          if (
+            await patchDocument(
+              moveDocument,
+              { folderId: moveFolderId === "all" ? null : moveFolderId },
+              "Document moved",
+            )
+          ) {
+            setMoveDocument(undefined);
+          }
+        }}
+      >
+        <Select
+          style={{ width: "100%" }}
+          value={moveFolderId}
+          onChange={setMoveFolderId}
+          options={[
+            { label: "All files", value: "all" },
+            ...folders.map((folder) => ({
+              label: folder.name,
+              value: folder.id,
+            })),
+          ]}
+        />
+      </Modal>
     </PageContainer>
   );
 }

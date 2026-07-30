@@ -17,10 +17,9 @@ import {
   Select,
   Typography,
 } from "antd";
-import { useState } from "react";
-import { permissions as initialPermissions } from "@/data/sampleData";
-import { useI18n } from "@/i18n";
-import { apiRequest, isApiConfigured } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { translateApiError, useI18n } from "@/i18n";
+import { apiRequest } from "@/lib/api";
 import type { DocumentItem, PermissionEntry, PermissionRole } from "@share";
 
 interface SharePermissionModalProps {
@@ -35,9 +34,11 @@ export function SharePermissionModal({
   onClose,
 }: SharePermissionModalProps) {
   const { message } = App.useApp();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [form] = Form.useForm();
-  const [entries, setEntries] = useState<PermissionEntry[]>(initialPermissions);
+  const [entries, setEntries] = useState<PermissionEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const permissionOptions = ["Viewer", "Commenter", "Editor", "Owner"].map((role) => {
     const keys = {
       Viewer: "role.viewer",
@@ -51,34 +52,77 @@ export function SharePermissionModal({
     };
   });
 
+  useEffect(() => {
+    if (!open || !document?.id) return;
+    setLoading(true);
+    apiRequest<PermissionEntry[]>(`/documents/${document.id}/permissions`)
+      .then(setEntries)
+      .catch((error) => {
+        const text = error instanceof Error ? error.message : "Failed to load permissions";
+        message.error(translateApiError(text, locale));
+        setEntries([]);
+      })
+      .finally(() => setLoading(false));
+  }, [document?.id, locale, message, open]);
+
   const invite = async () => {
     const values = await form.validateFields();
     const email = String(values.email);
-
-    if (isApiConfigured && document?.id) {
-      try {
-        const role = String(values.role).toUpperCase();
-        await apiRequest(`/documents/${document.id}/permissions`, {
+    if (!document?.id) return;
+    setSaving(true);
+    try {
+      const role = String(values.role).toUpperCase();
+      const created = await apiRequest<PermissionEntry>(
+        `/documents/${document.id}/permissions`,
+        {
           method: "POST",
           body: JSON.stringify({ email, role }),
-        });
-      } catch (err) {
-        console.warn("Share API failed:", err);
-      }
+        },
+      );
+      setEntries((current) => [
+        ...current.filter((entry) => entry.id !== created.id),
+        created,
+      ]);
+      form.resetFields(["email"]);
+      message.success(t("share.sent"));
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Failed to grant access";
+      message.error(translateApiError(text, locale));
+    } finally {
+      setSaving(false);
     }
+  };
 
-    setEntries((current) => [
-      ...current,
-      {
-        id: `perm-${Date.now()}`,
-        name: email.split("@")[0],
-        email,
-        role: values.role as PermissionRole,
-        initials: email.slice(0, 2).toUpperCase(),
-      },
-    ]);
-    form.resetFields(["email"]);
-    message.success(t("share.sent"));
+  const changeRole = async (entry: PermissionEntry, role: PermissionRole) => {
+    if (!document?.id) return;
+    try {
+      const updated = await apiRequest<PermissionEntry>(
+        `/documents/${document.id}/permissions/${entry.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ role: role.toUpperCase() }),
+        },
+      );
+      setEntries((current) =>
+        current.map((item) => (item.id === entry.id ? updated : item)),
+      );
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Failed to update access";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
+  const remove = async (entry: PermissionEntry) => {
+    if (!document?.id) return;
+    try {
+      await apiRequest(`/documents/${document.id}/permissions/${entry.id}`, {
+        method: "DELETE",
+      });
+      setEntries((current) => current.filter((item) => item.id !== entry.id));
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Failed to remove access";
+      message.error(translateApiError(text, locale));
+    }
   };
 
   return (
@@ -107,7 +151,7 @@ export function SharePermissionModal({
         <Button
           key="copy"
           icon={<LinkOutlined />}
-          onClick={() => message.success(t("share.copied"))}
+          disabled
         >
           {t("share.copy")}
         </Button>,
@@ -141,6 +185,7 @@ export function SharePermissionModal({
           className="share-invite-button"
           type="primary"
           icon={<SendOutlined />}
+          loading={saving}
           onClick={invite}
         >
           {t("share.send")}
@@ -155,6 +200,7 @@ export function SharePermissionModal({
       </div>
       <List
         className="permission-list"
+        loading={loading}
         dataSource={entries}
         renderItem={(entry) => (
           <List.Item
@@ -167,24 +213,14 @@ export function SharePermissionModal({
                 value={entry.role}
                 style={{ width: 136 }}
                 options={permissionOptions}
-                onChange={(role) =>
-                  setEntries((current) =>
-                    current.map((item) =>
-                      item.id === entry.id ? { ...item, role } : item,
-                    ),
-                  )
-                }
+                onChange={(role) => void changeRole(entry, role)}
               />,
               ...(entry.role !== "Owner"
                 ? [
                     <Popconfirm
                       key="remove"
                       title={t("share.removeTitle")}
-                      onConfirm={() =>
-                        setEntries((current) =>
-                          current.filter((item) => item.id !== entry.id),
-                        )
-                      }
+                      onConfirm={() => remove(entry)}
                     >
                       <Button
                         aria-label={t("share.remove", { name: entry.name })}

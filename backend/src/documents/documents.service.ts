@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import {
   DocumentStatus,
-  DocumentType,
   PermissionRole,
   Prisma,
 } from "@prisma/client";
@@ -15,10 +20,27 @@ import type {
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
+import {
+  CreatePermissionDto,
+  UpdatePermissionDto,
+} from "./dto/permission.dto";
 
 import { StorageService } from "../storage/storage.service";
 
 type DocumentScope = "all" | "shared" | "trash";
+
+interface OnlyOfficeTicket {
+  type: "onlyoffice-callback";
+  documentId: string;
+  userId: string;
+}
+
+const contentTypes: Record<string, string> = {
+  DOCX: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  XLSX: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  PPTX: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  PDF: "application/pdf",
+};
 
 const publicType = (value: string): PublicDocumentType =>
   value.toLowerCase() as PublicDocumentType;
@@ -71,7 +93,7 @@ export class DocumentsService {
             ownerId: { not: user.id },
             permissions: { some: this.permissionWhere(user) },
           }
-        : { OR: this.accessWhere(user) }),
+        : this.accessWhere(user)),
     };
 
     const documents = await this.prisma.document.findMany({
@@ -89,7 +111,7 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
     const document = await this.prisma.document.findFirst({
-      where: { id, OR: this.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessWhere(user) },
       include: this.publicInclude(user),
     });
 
@@ -102,7 +124,14 @@ export class DocumentsService {
     input: UpdateDocumentDto,
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
-    await this.ensureOwnedDocument(id, user);
+    const ownedDocument = await this.ensureOwnedDocument(id, user);
+    if (input.folderId) {
+      const folder = await this.prisma.folder.findFirst({
+        where: { id: input.folderId, ownerId: ownedDocument.ownerId },
+        select: { id: true },
+      });
+      if (!folder) throw new NotFoundException("Destination folder not found");
+    }
     const document = await this.prisma.document.update({
       where: { id },
       data: {
@@ -138,6 +167,52 @@ export class DocumentsService {
     return this.toPublicItem(document, user.id);
   }
 
+  async permanentDelete(id: string, user: AuthenticatedUser) {
+    const document = await this.prisma.document.findFirst({
+      where: {
+        id,
+        deletedAt: { not: null },
+        ...this.ownerWhere(user),
+      },
+      select: {
+        id: true,
+        versions: { select: { objectKey: true } },
+      },
+    });
+    if (!document) throw new NotFoundException("Trashed document not found");
+    await this.storage.deleteObjects(
+      document.versions.map((version) => version.objectKey),
+    );
+    await this.prisma.document.delete({ where: { id } });
+    return { id, status: "deleted_permanently" as const };
+  }
+
+  async emptyTrash(user: AuthenticatedUser) {
+    const documents = await this.prisma.document.findMany({
+      where: {
+        deletedAt: { not: null },
+        ownerId: user.id,
+      },
+      select: {
+        id: true,
+        versions: { select: { objectKey: true } },
+      },
+    });
+    await this.storage.deleteObjects(
+      documents.flatMap((document) =>
+        document.versions.map((version) => version.objectKey),
+      ),
+    );
+    const deleted = await this.prisma.document.deleteMany({
+      where: {
+        id: { in: documents.map((document) => document.id) },
+        ownerId: user.id,
+        deletedAt: { not: null },
+      },
+    });
+    return { status: "trash_emptied" as const, count: deleted.count };
+  }
+
   async toggleStar(
     id: string,
     user: AuthenticatedUser,
@@ -158,7 +233,7 @@ export class DocumentsService {
 
   async getEditorConfig(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, OR: this.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessWhere(user) },
       include: {
         permissions: {
           where: this.permissionWhere(user),
@@ -179,12 +254,39 @@ export class DocumentsService {
     const documentType = getDocumentType(document.name);
     const fileExt = document.name.split(".").pop()?.toLowerCase() || "docx";
 
-    const apiPublicUrl = this.config.get<string>("API_PUBLIC_URL", "http://103.190.38.46:5000/api");
-    const onlyofficeServerUrl = this.config.get<string>("ONLYOFFICE_SERVER_URL", "http://103.190.38.46:8080");
-    const jwtSecret = this.config.get<string>("ONLYOFFICE_JWT_SECRET") || this.config.get<string>("JWT_ACCESS_SECRET", "secret");
-
-    const documentUrl = `${apiPublicUrl}/documents/${document.id}/download`;
-    const callbackUrl = `${apiPublicUrl}/documents/${document.id}/callback`;
+    const apiPublicUrl = this.config.get<string>("API_PUBLIC_URL");
+    const onlyofficeServerUrl = this.config.get<string>("ONLYOFFICE_SERVER_URL");
+    const jwtSecret = this.config.get<string>("ONLYOFFICE_JWT_SECRET");
+    if (!apiPublicUrl || !onlyofficeServerUrl || !jwtSecret) {
+      throw new ServiceUnavailableException(
+        "ONLYOFFICE_SERVER_URL, ONLYOFFICE_JWT_SECRET and API_PUBLIC_URL must be configured",
+      );
+    }
+    const currentVersion = await this.prisma.documentVersion.findFirst({
+      where: {
+        documentId: document.id,
+        ...(document.currentVersionId
+          ? { id: document.currentVersionId }
+          : {}),
+      },
+      orderBy: { version: "desc" },
+      select: { objectKey: true },
+    });
+    if (!currentVersion) {
+      throw new NotFoundException("Document has no uploaded version");
+    }
+    const documentUrl = (await this.storage.createDownloadUrl(
+      currentVersion.objectKey,
+    )).url;
+    const callbackTicket = await this.jwt.signAsync<OnlyOfficeTicket>(
+      {
+        type: "onlyoffice-callback",
+        documentId: document.id,
+        userId: user.id,
+      },
+      { secret: jwtSecret, expiresIn: "24h" },
+    );
+    const callbackUrl = `${apiPublicUrl.replace(/\/$/, "")}/documents/${document.id}/onlyoffice-callback?ticket=${encodeURIComponent(callbackTicket)}`;
 
     const configPayload = {
       documentType,
@@ -227,156 +329,178 @@ export class DocumentsService {
     };
   }
 
-  async uploadDocument(
-    file: { originalname: string; buffer: Buffer; mimetype: string; size: number },
-    folderId: string | undefined,
-    user: AuthenticatedUser,
-  ): Promise<DocumentItem> {
-    const ext = file.originalname.split(".").pop()?.toLowerCase() || "docx";
-    let docType: DocumentType = DocumentType.DOCX;
-    if (["xlsx", "xls", "csv"].includes(ext)) docType = DocumentType.XLSX;
-    else if (["pptx", "ppt"].includes(ext)) docType = DocumentType.PPTX;
-    else if (ext === "pdf") docType = DocumentType.PDF;
-
-    const document = await this.prisma.document.create({
-      data: {
-        name: file.originalname,
-        type: docType,
-        status: DocumentStatus.READY,
-        ownerId: user.id,
-        folderId: folderId && folderId !== "all" ? folderId : null,
-        versions: {
-          create: {
-            version: 1,
-            objectKey: `documents/${user.id}/${Date.now()}_${file.originalname}`,
-            sizeBytes: BigInt(file.size),
-            authorId: user.id,
-          },
-        },
-      },
-      include: this.publicInclude(user),
-    });
-
-    const objectKey = document.versions[0]?.objectKey;
-    if (objectKey) {
-      try {
-        await this.storage.putObject(objectKey, file.buffer, file.mimetype);
-      } catch (err) {
-        console.warn("[Storage] PutObject failed:", err);
-      }
+  async handleOnlyOfficeCallback(
+    id: string,
+    ticket: string,
+    body: Record<string, unknown>,
+  ) {
+    const jwtSecret = this.config.get<string>("ONLYOFFICE_JWT_SECRET");
+    if (!jwtSecret || !ticket) {
+      throw new UnauthorizedException("ONLYOFFICE callback ticket is required");
     }
 
-    return this.toPublicItem(document, user.id);
-  }
+    let principal: OnlyOfficeTicket;
+    try {
+      principal = await this.jwt.verifyAsync<OnlyOfficeTicket>(ticket, {
+        secret: jwtSecret,
+      });
+    } catch {
+      throw new UnauthorizedException("ONLYOFFICE callback ticket is invalid");
+    }
+    if (
+      principal.type !== "onlyoffice-callback" ||
+      principal.documentId !== id
+    ) {
+      throw new UnauthorizedException("ONLYOFFICE callback ticket is invalid");
+    }
 
-  async downloadFile(id: string) {
-    const document = await this.prisma.document.findUnique({
-      where: { id },
-      include: {
-        versions: {
-          orderBy: { version: "desc" },
-          take: 1,
-        },
-      },
+    if (body.status !== 2 && body.status !== 6) return { error: 0 };
+    if (typeof body.url !== "string") {
+      throw new BadRequestException("ONLYOFFICE callback URL is missing");
+    }
+
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, ownerId: true, type: true },
     });
     if (!document) throw new NotFoundException("Document not found");
 
-    const objectKey = document.versions[0]?.objectKey;
-    if (objectKey) {
-      try {
-        const stream = await this.storage.getObjectStream(objectKey);
-        if (stream) {
-          const chunks: Uint8Array[] = [];
-          for await (const chunk of stream as AsyncIterable<Uint8Array>) {
-            chunks.push(chunk);
-          }
-          return {
-            filename: document.name,
-            buffer: Buffer.concat(chunks),
-          };
-        }
-      } catch (err) {
-        console.warn("[Storage] Download stream failed, using fallback:", err);
-      }
+    const configuredOnlyOfficeUrl =
+      this.config.get<string>("ONLYOFFICE_INTERNAL_URL") ??
+      this.config.get<string>("ONLYOFFICE_SERVER_URL");
+    if (!configuredOnlyOfficeUrl) {
+      throw new ServiceUnavailableException("ONLYOFFICE server is not configured");
     }
 
-    return {
-      filename: document.name,
-      buffer: Buffer.from(`Sample content for document: ${document.name}`),
-    };
-  }
-
-  async handleCallback(id: string, body: Record<string, unknown>) {
-    console.log(`[ONLYOFFICE Callback] Document ${id}:`, body);
-    if (body.status === 2 && typeof body.url === "string") {
-      try {
-        const response = await fetch(body.url);
-        if (response.ok) {
-          const arrayBuffer = await response.arrayBuffer();
-          const buffer = Buffer.from(arrayBuffer);
-
-          const lastVersion = await this.prisma.documentVersion.findFirst({
-            where: { documentId: id },
-            orderBy: { version: "desc" },
-          });
-
-          const nextVersionNumber = (lastVersion?.version ?? 0) + 1;
-          const objectKey = `documents/${id}/v${nextVersionNumber}_${Date.now()}`;
-
-          await this.storage.putObject(
-            objectKey,
-            buffer,
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          );
-
-          await this.prisma.documentVersion.create({
-            data: {
-              documentId: id,
-              version: nextVersionNumber,
-              objectKey,
-              sizeBytes: BigInt(buffer.length),
-              authorId: lastVersion?.authorId || id,
-            },
-          });
-
-          await this.prisma.document.update({
-            where: { id },
-            data: { updatedAt: new Date() },
-          });
-
-          console.log(`[ONLYOFFICE Callback] Saved version ${nextVersionNumber} for document ${id}`);
-        }
-      } catch (err) {
-        console.error(`[ONLYOFFICE Callback] Failed to save edited file:`, err);
-      }
+    let sourceUrl: URL;
+    try {
+      sourceUrl = new URL(body.url);
+    } catch {
+      throw new BadRequestException("ONLYOFFICE callback URL is invalid");
     }
-    return { error: 0 };
+    if (sourceUrl.origin !== new URL(configuredOnlyOfficeUrl).origin) {
+      throw new BadRequestException("ONLYOFFICE callback URL is not trusted");
+    }
+
+    const maxBytes = this.readPositiveNumber(
+      this.config.get<string>("ONLYOFFICE_MAX_DOWNLOAD_BYTES"),
+      104_857_600,
+    );
+    const response = await fetch(sourceUrl, {
+      signal: AbortSignal.timeout(30_000),
+      redirect: "error",
+    });
+    if (!response.ok) {
+      throw new ServiceUnavailableException(
+        `ONLYOFFICE returned HTTP ${response.status}`,
+      );
+    }
+    const declaredSize = Number(response.headers.get("content-length"));
+    if (Number.isFinite(declaredSize) && declaredSize > maxBytes) {
+      throw new BadRequestException("Edited document exceeds the size limit");
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > maxBytes) {
+      throw new BadRequestException("Edited document has an invalid size");
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const lastVersion = await tx.documentVersion.findFirst({
+        where: { documentId: id },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      });
+      const nextVersion = (lastVersion?.version ?? 0) + 1;
+      const objectKey = `documents/${document.ownerId}/${document.id}/onlyoffice-${nextVersion}-${Date.now()}`;
+      await this.storage.putObject(
+        objectKey,
+        buffer,
+        contentTypes[document.type] ?? "application/octet-stream",
+      );
+      const created = await tx.documentVersion.create({
+        data: {
+          documentId: id,
+          version: nextVersion,
+          objectKey,
+          sizeBytes: BigInt(buffer.length),
+          authorId: principal.userId,
+        },
+        select: { id: true, version: true },
+      });
+      await tx.document.update({
+        where: { id },
+        data: { currentVersionId: created.id },
+      });
+      return created;
+    });
+
+    return { error: 0, version: result.version };
   }
 
   async addPermission(
     id: string,
-    email: string,
-    role: "VIEWER" | "COMMENTER" | "EDITOR",
+    input: CreatePermissionDto,
     user: AuthenticatedUser,
   ) {
     await this.ensureOwnedDocument(id, user);
 
     const targetUser = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: input.email },
       select: { id: true },
     });
 
-    const permission = await this.prisma.documentPermission.create({
-      data: {
+    const permission = await this.prisma.documentPermission.upsert({
+      where: {
+        documentId_email: {
+          documentId: id,
+          email: input.email,
+        },
+      },
+      create: {
         documentId: id,
-        email,
+        email: input.email,
         userId: targetUser?.id,
-        role: role as PermissionRole,
+        role: input.role,
         grantedById: user.id,
       },
+      update: {
+        userId: targetUser?.id,
+        role: input.role,
+        grantedById: user.id,
+      },
+      include: { user: { select: { name: true } } },
     });
 
-    return permission;
+    return this.toPermissionEntry(permission);
+  }
+
+  async listPermissions(id: string, user: AuthenticatedUser) {
+    await this.ensureOwnedDocument(id, user);
+    const permissions = await this.prisma.documentPermission.findMany({
+      where: { documentId: id },
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+    return permissions.map((permission) => this.toPermissionEntry(permission));
+  }
+
+  async updatePermission(
+    id: string,
+    permissionId: string,
+    input: UpdatePermissionDto,
+    user: AuthenticatedUser,
+  ) {
+    await this.ensureOwnedDocument(id, user);
+    const updated = await this.prisma.documentPermission.updateMany({
+      where: { id: permissionId, documentId: id },
+      data: { role: input.role, grantedById: user.id },
+    });
+    if (updated.count !== 1) throw new NotFoundException("Permission not found");
+    const permission = await this.prisma.documentPermission.findUniqueOrThrow({
+      where: { id: permissionId },
+      include: { user: { select: { name: true } } },
+    });
+    return this.toPermissionEntry(permission);
   }
 
   async removePermission(
@@ -385,15 +509,16 @@ export class DocumentsService {
     user: AuthenticatedUser,
   ) {
     await this.ensureOwnedDocument(id, user);
-    await this.prisma.documentPermission.delete({
-      where: { id: permissionId },
+    const removed = await this.prisma.documentPermission.deleteMany({
+      where: { id: permissionId, documentId: id },
     });
+    if (removed.count !== 1) throw new NotFoundException("Permission not found");
     return { id: permissionId, status: "removed" };
   }
 
   async getVersions(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
-      where: { id, OR: this.accessWhere(user) },
+      where: { id, deletedAt: null, ...this.accessWhere(user) },
       select: { id: true },
     });
     if (!document) throw new NotFoundException("Document not found");
@@ -425,25 +550,28 @@ export class DocumentsService {
     });
     if (!targetVersion) throw new NotFoundException("Version not found");
 
-    const lastVersion = await this.prisma.documentVersion.findFirst({
-      where: { documentId: id },
-      orderBy: { version: "desc" },
-    });
-
-    const nextVersionNumber = (lastVersion?.version ?? 0) + 1;
-    const newVersion = await this.prisma.documentVersion.create({
-      data: {
-        documentId: id,
-        version: nextVersionNumber,
-        objectKey: targetVersion.objectKey,
-        sizeBytes: targetVersion.sizeBytes,
-        authorId: user.id,
-      },
-    });
-
-    await this.prisma.document.update({
-      where: { id },
-      data: { updatedAt: new Date() },
+    const newVersion = await this.prisma.$transaction(async (tx) => {
+      const lastVersion = await tx.documentVersion.findFirst({
+        where: { documentId: id },
+        orderBy: { version: "desc" },
+        select: { version: true },
+      });
+      const created = await tx.documentVersion.create({
+        data: {
+          documentId: id,
+          version: (lastVersion?.version ?? 0) + 1,
+          objectKey: targetVersion.objectKey,
+          sizeBytes: targetVersion.sizeBytes,
+          checksum: targetVersion.checksum,
+          note: `Restored from version ${targetVersion.version}`,
+          authorId: user.id,
+        },
+      });
+      await tx.document.update({
+        where: { id },
+        data: { currentVersionId: created.id },
+      });
+      return created;
     });
 
     return {
@@ -452,12 +580,36 @@ export class DocumentsService {
     };
   }
 
+  async createVersionDownloadUrl(
+    id: string,
+    versionNumber: number,
+    user: AuthenticatedUser,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null, ...this.accessWhere(user) },
+      select: { id: true, name: true },
+    });
+    if (!document) throw new NotFoundException("Document not found");
+    const version = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id, version: versionNumber },
+      select: { objectKey: true },
+    });
+    if (!version) throw new NotFoundException("Version not found");
+    return {
+      documentId: id,
+      name: document.name,
+      version: versionNumber,
+      ...(await this.storage.createDownloadUrl(version.objectKey)),
+    };
+  }
+
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.ownerWhere(user) },
-      select: { id: true },
+      select: { id: true, ownerId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
+    return document;
   }
 
   private publicInclude(user: AuthenticatedUser) {
@@ -474,6 +626,7 @@ export class DocumentsService {
         take: 1,
         select: { role: true },
       },
+      _count: { select: { permissions: true } },
     } satisfies Prisma.DocumentInclude;
   }
 
@@ -496,7 +649,7 @@ export class DocumentsService {
       size: formatBytes(document.versions[0]?.sizeBytes),
       status: publicStatus(document.status),
       folderId: document.folder?.id ?? "all",
-      shared: document.permissions.length > 0,
+      shared: document._count.permissions > 0,
       ...(document.starred ? { starred: true } : {}),
       ...(document.deletedAt
         ? { deletedAt: document.deletedAt.toISOString() }
@@ -513,12 +666,14 @@ export class DocumentsService {
     } satisfies Prisma.DocumentPermissionWhereInput;
   }
 
-  private accessWhere(user: AuthenticatedUser) {
-    if (user.role === "ADMINISTRATOR") return [{}];
-    return [
-      { ownerId: user.id },
-      { permissions: { some: this.permissionWhere(user) } },
-    ] satisfies Prisma.DocumentWhereInput[];
+  private accessWhere(user: AuthenticatedUser): Prisma.DocumentWhereInput {
+    if (user.role === "ADMINISTRATOR") return {};
+    return {
+      OR: [
+        { ownerId: user.id },
+        { permissions: { some: this.permissionWhere(user) } },
+      ],
+    };
   }
 
   private ownerWhere(user: AuthenticatedUser): Prisma.DocumentWhereInput {
@@ -531,5 +686,32 @@ export class DocumentsService {
       | "Commenter"
       | "Editor"
       | "Owner";
+  }
+
+  private toPermissionEntry(permission: {
+    id: string;
+    email: string | null;
+    role: PermissionRole;
+    user: { name: string } | null;
+  }) {
+    const email = permission.email ?? "";
+    const name = permission.user?.name ?? email.split("@")[0] ?? email;
+    return {
+      id: permission.id,
+      name,
+      email,
+      role: this.toPublicPermission(permission.role),
+      initials: name
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase(),
+    };
+  }
+
+  private readPositiveNumber(value: string | undefined, fallback: number) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   }
 }

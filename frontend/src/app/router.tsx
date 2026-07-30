@@ -22,9 +22,6 @@ const TrashPage = lazy(() =>
 const EditorPage = lazy(() =>
   import("@/pages/EditorPage").then((module) => ({ default: module.EditorPage })),
 );
-const WorkspacePage = lazy(() =>
-  import("@/pages/WorkspacePage").then((module) => ({ default: module.WorkspacePage })),
-);
 const UsersPage = lazy(() =>
   import("@/pages/admin/UsersPage").then((module) => ({ default: module.UsersPage })),
 );
@@ -62,7 +59,7 @@ export const router = createBrowserRouter([
     path: "/workspace",
     element: load(
       <RequireAuth>
-        <WorkspacePage />
+        <Navigate to="/documents" replace />
       </RequireAuth>,
       "workspace",
     ),
