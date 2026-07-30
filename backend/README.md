@@ -64,7 +64,19 @@ S3_SECRET_KEY=change-me
 S3_BUCKET=meridian-documents
 S3_FORCE_PATH_STYLE=true
 S3_URL_TTL_SECONDS=900
+MINIO_METRICS_URL=http://host.docker.internal:9000
+MINIO_METRICS_TOKEN=
+STORAGE_QUOTA_BYTES=107374182400
 ```
+
+Dashboard storage capacity is read from MinIO metrics v3, with automatic v2
+fallback. MinIO requires a bearer token by default. Generate one with
+`mc admin prometheus generate ALIAS --api-version v3` and copy the generated
+`bearer_token` value to `MINIO_METRICS_TOKEN`. For a trusted local-only MinIO
+deployment, metrics can instead be made public by starting MinIO with
+`MINIO_PROMETHEUS_AUTH_TYPE=public`; leave `MINIO_METRICS_TOKEN` empty in that
+case. When metrics are unavailable, the dashboard explicitly falls back to
+`STORAGE_QUOTA_BYTES`.
 
 From the repository root:
 

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { DocumentStatus } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
+import { StorageService } from "../storage/storage.service";
 
 @Injectable()
 export class DashboardService {
@@ -10,6 +11,7 @@ export class DashboardService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
     config: ConfigService,
   ) {
     const configuredQuota = Number(config.get("STORAGE_QUOTA_BYTES"));
@@ -30,6 +32,7 @@ export class DashboardService {
       versionStorage,
       ownedDocuments,
       auditLogs,
+      storageCapacity,
     ] = await Promise.all([
       this.prisma.document.count({ where: ownedWhere }),
       this.prisma.folder.count({ where: { ownerId: user.id } }),
@@ -69,6 +72,7 @@ export class DashboardService {
           actor: { select: { name: true } },
         },
       }),
+      this.storage.capacity(),
     ]);
 
     const currentVersionIds = ownedDocuments
@@ -81,8 +85,15 @@ export class DashboardService {
         })
       : { _sum: { sizeBytes: null } };
 
-    const usedBytes = this.safeNumber(versionStorage._sum.sizeBytes);
+    const workspaceBytes = this.safeNumber(versionStorage._sum.sizeBytes);
     const documentsBytes = this.safeNumber(currentStorage._sum.sizeBytes);
+    const totalBytes = storageCapacity?.totalBytes ?? this.quotaBytes;
+    const freeBytes =
+      storageCapacity?.freeBytes ??
+      Math.max(this.quotaBytes - workspaceBytes, 0);
+    const usedBytes = storageCapacity
+      ? Math.max(totalBytes - freeBytes, 0)
+      : workspaceBytes;
 
     return {
       metrics: {
@@ -93,14 +104,18 @@ export class DashboardService {
         versions: versionCount,
       },
       storage: {
+        source: storageCapacity?.source ?? "configured_quota",
         usedBytes,
-        quotaBytes: this.quotaBytes,
+        totalBytes,
+        freeBytes,
+        workspaceBytes,
         documentsBytes,
-        versionsBytes: Math.max(usedBytes - documentsBytes, 0),
+        versionsBytes: Math.max(workspaceBytes - documentsBytes, 0),
         percent:
-          this.quotaBytes > 0
-            ? Math.min(Math.round((usedBytes / this.quotaBytes) * 100), 100)
+          totalBytes > 0
+            ? Math.min(Math.round((usedBytes / totalBytes) * 100), 100)
             : 0,
+        measuredAt: storageCapacity?.measuredAt ?? null,
       },
       activities: auditLogs.map((log) => {
         const metadata =

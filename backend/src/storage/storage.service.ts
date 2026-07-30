@@ -10,12 +10,23 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+export interface StorageCapacity {
+  totalBytes: number;
+  freeBytes: number;
+  source: "minio_metrics_v3" | "minio_metrics_v2";
+  measuredAt: string;
+}
+
 @Injectable()
 export class StorageService {
   private readonly internalClient: S3Client;
   private readonly publicClient: S3Client;
   private readonly bucket: string;
   private readonly expiresIn: number;
+  private capacityCache?: {
+    expiresAt: number;
+    value: StorageCapacity | null;
+  };
 
   constructor(private readonly config: ConfigService) {
     const endpoint = this.config.get<string>("S3_ENDPOINT");
@@ -104,6 +115,81 @@ export class StorageService {
     }
   }
 
+  async capacity(): Promise<StorageCapacity | null> {
+    const now = Date.now();
+    if (this.capacityCache && this.capacityCache.expiresAt > now) {
+      return this.capacityCache.value;
+    }
+
+    const baseUrl =
+      this.config.get<string>("MINIO_METRICS_URL") ||
+      this.config.get<string>("S3_ENDPOINT");
+    if (!baseUrl) return null;
+
+    const token = this.config.get<string>("MINIO_METRICS_TOKEN");
+    const headers = new Headers({ Accept: "text/plain" });
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+
+    const endpoints = [
+      {
+        path: "/minio/metrics/v3/cluster/health",
+        source: "minio_metrics_v3" as const,
+        totalMetric:
+          "minio_cluster_health_capacity_usable_total_bytes",
+        freeMetric:
+          "minio_cluster_health_capacity_usable_free_bytes",
+      },
+      {
+        path: "/minio/v2/metrics/cluster",
+        source: "minio_metrics_v2" as const,
+        totalMetric: "minio_cluster_capacity_usable_total_bytes",
+        freeMetric: "minio_cluster_capacity_usable_free_bytes",
+      },
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const response = await fetch(
+          `${baseUrl.replace(/\/$/, "")}${endpoint.path}`,
+          {
+            headers,
+            signal: AbortSignal.timeout(3_000),
+          },
+        );
+        if (!response.ok) continue;
+        const body = await response.text();
+        const totalBytes = this.metricValue(body, endpoint.totalMetric);
+        const freeBytes = this.metricValue(body, endpoint.freeMetric);
+        if (
+          totalBytes !== null &&
+          freeBytes !== null &&
+          totalBytes > 0 &&
+          freeBytes >= 0
+        ) {
+          const value: StorageCapacity = {
+            totalBytes,
+            freeBytes: Math.min(freeBytes, totalBytes),
+            source: endpoint.source,
+            measuredAt: new Date().toISOString(),
+          };
+          this.capacityCache = {
+            expiresAt: now + 30_000,
+            value,
+          };
+          return value;
+        }
+      } catch {
+        // Try the legacy metrics endpoint, then fall back to configured quota.
+      }
+    }
+
+    this.capacityCache = {
+      expiresAt: now + 10_000,
+      value: null,
+    };
+    return null;
+  }
+
   private configured() {
     return Boolean(
       this.config.get<string>("S3_ENDPOINT") &&
@@ -151,5 +237,19 @@ export class StorageService {
     if (!this.configured()) {
       throw new ServiceUnavailableException("Object storage is not configured");
     }
+  }
+
+  private metricValue(body: string, metric: string): number | null {
+    for (const line of body.split(/\r?\n/)) {
+      if (
+        !line.startsWith(`${metric} `) &&
+        !line.startsWith(`${metric}{`)
+      ) {
+        continue;
+      }
+      const value = Number(line.trim().split(/\s+/).at(-1));
+      if (Number.isFinite(value) && value >= 0) return value;
+    }
+    return null;
   }
 }

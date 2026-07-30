@@ -11,12 +11,19 @@ export function Sidebar({ collapsed }: SidebarProps) {
   const storage = data?.storage;
   const percent = storage?.percent ?? 0;
   const storageLabel = storage
-    ? `${formatBytes(storage.usedBytes)} of ${formatBytes(storage.quotaBytes)} used`
+    ? `${formatBytes(storage.usedBytes)} of ${formatBytes(storage.totalBytes)} used`
     : "Storage unavailable";
+  const storageSource =
+    storage?.source === "configured_quota"
+      ? "Configured quota"
+      : "Live MinIO capacity";
 
   if (collapsed) {
     return (
-      <Tooltip title={storageLabel} placement="right">
+      <Tooltip
+        title={`${storageSource}: ${storageLabel}`}
+        placement="right"
+      >
         <div className="sidebar-storage-collapsed" aria-label="Storage usage">
           <CloudServerOutlined />
           <Progress
@@ -42,6 +49,7 @@ export function Sidebar({ collapsed }: SidebarProps) {
       </div>
       <Progress percent={percent} showInfo={false} size="small" />
       <Typography.Text type="secondary">{storageLabel}</Typography.Text>
+      <Typography.Text type="secondary">{storageSource}</Typography.Text>
       <div className="sidebar-compliance">
         <SafetyCertificateOutlined />
         <Typography.Text type="secondary">Enterprise protected</Typography.Text>

@@ -9,7 +9,7 @@ import {
 import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
 import type { PrismaService } from "../src/prisma/prisma.service";
-import type { StorageService } from "../src/storage/storage.service";
+import { StorageService } from "../src/storage/storage.service";
 import type { AuditService } from "../src/audit/audit.service";
 import { AdminService } from "../src/admin/admin.service";
 import { AuthService } from "../src/auth/auth.service";
@@ -191,4 +191,34 @@ test("the last active administrator cannot be suspended", async () => {
       ),
     BadRequestException,
   );
+});
+
+test("MinIO v3 metrics report real usable storage capacity", async () => {
+  const config = {
+    get: (key: string, fallback?: unknown) => {
+      const values: Record<string, string> = {
+        S3_ENDPOINT: "http://minio.internal:9000",
+        S3_REGION: "us-east-1",
+      };
+      return values[key] ?? fallback;
+    },
+  } as unknown as ConfigService;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(
+      [
+        "minio_cluster_health_capacity_usable_total_bytes 1000",
+        "minio_cluster_health_capacity_usable_free_bytes 400",
+      ].join("\n"),
+      { status: 200 },
+    )) as typeof fetch;
+
+  try {
+    const capacity = await new StorageService(config).capacity();
+    assert.equal(capacity?.totalBytes, 1000);
+    assert.equal(capacity?.freeBytes, 400);
+    assert.equal(capacity?.source, "minio_metrics_v3");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

@@ -103,11 +103,15 @@ export interface DashboardResponse {
     versions: number;
   };
   storage: {
+    source: "minio_metrics_v3" | "minio_metrics_v2" | "configured_quota";
     usedBytes: number;
-    quotaBytes: number;
+    totalBytes: number;
+    freeBytes: number;
+    workspaceBytes: number;
     documentsBytes: number;
     versionsBytes: number;
     percent: number;
+    measuredAt: string | null;
   };
   activities: ActivityItem[];
 }

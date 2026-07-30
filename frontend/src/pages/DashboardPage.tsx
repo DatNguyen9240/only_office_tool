@@ -170,7 +170,13 @@ export function DashboardPage() {
               )}
             />
           </ProCard>
-          <ProCard title="Workspace storage">
+          <ProCard
+            title={
+              dashboard?.storage.source === "configured_quota"
+                ? "Workspace storage quota"
+                : "MinIO storage capacity"
+            }
+          >
             <div className="storage-summary">
               <Space align="center" size={12}>
                 <span className="storage-icon">
@@ -181,7 +187,7 @@ export function DashboardPage() {
                     {formatBytes(dashboard?.storage.usedBytes ?? 0)} used
                   </Typography.Text>
                   <Typography.Text type="secondary">
-                    of {formatBytes(dashboard?.storage.quotaBytes ?? 0)} available
+                    of {formatBytes(dashboard?.storage.totalBytes ?? 0)} total
                   </Typography.Text>
                 </div>
               </Space>
@@ -191,12 +197,18 @@ export function DashboardPage() {
               />
               <div className="storage-legend">
                 <span>
-                  Documents {formatBytes(dashboard?.storage.documentsBytes ?? 0)}
+                  Free {formatBytes(dashboard?.storage.freeBytes ?? 0)}
                 </span>
                 <span>
-                  Versions {formatBytes(dashboard?.storage.versionsBytes ?? 0)}
+                  This workspace{" "}
+                  {formatBytes(dashboard?.storage.workspaceBytes ?? 0)}
                 </span>
               </div>
+              <Typography.Text type="secondary">
+                {dashboard?.storage.source === "configured_quota"
+                  ? "MinIO metrics unavailable; showing configured quota."
+                  : "Capacity reported by MinIO metrics."}
+              </Typography.Text>
             </div>
           </ProCard>
         </div>
