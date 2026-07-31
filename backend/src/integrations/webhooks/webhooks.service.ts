@@ -1,4 +1,6 @@
 import {
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -7,10 +9,15 @@ import { Prisma } from "@prisma/client";
 import type { AuthenticatedUser } from "../../core/auth/auth.types";
 import { PrismaService } from "../../database/prisma/prisma.service";
 import { CreateWebhookDto } from "./dto/webhook.dto";
+import { OperationsService } from "../operations/operations.service";
 
 @Injectable()
 export class WebhooksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => OperationsService))
+    private readonly operations: OperationsService,
+  ) {}
 
   list(user: AuthenticatedUser) {
     return this.prisma.webhookSubscription.findMany({
@@ -60,7 +67,7 @@ export class WebhooksService {
           payload: payload as Prisma.InputJsonValue,
         },
       });
-      void this.deliver(delivery.id);
+      await this.operations.enqueueWebhookDeliver(delivery.id);
     }
   }
 
@@ -70,11 +77,11 @@ export class WebhooksService {
       select: { id: true },
     });
     if (!delivery) throw new NotFoundException("Webhook delivery not found");
-    await this.deliver(id);
+    await this.operations.enqueueWebhookDeliver(id);
     return { id, status: "queued" as const };
   }
 
-  private async deliver(id: string) {
+  async deliverDirectly(id: string) {
     const delivery = await this.prisma.webhookDelivery.findUnique({
       where: { id },
       include: {
@@ -129,6 +136,7 @@ export class WebhooksService {
           ),
         },
       });
+      throw error;
     }
   }
 }

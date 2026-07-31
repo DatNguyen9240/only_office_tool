@@ -1,4 +1,6 @@
 import {
+  forwardRef,
+  Inject,
   Injectable,
   Logger,
   OnApplicationShutdown,
@@ -14,10 +16,14 @@ import { MalwareScannerService } from "./malware-scanner.service";
 import { ContentExtractionService } from "../indexing/content-extraction.service";
 import { ElasticsearchService } from "../indexing/elasticsearch.service";
 import { DOCUMENT_MIME_TYPES } from "../../common/constants/mime-types.constant";
+import { WebhooksService } from "../webhooks/webhooks.service";
+import { MailService } from "../mail/mail.service";
 
 type OperationJob =
   | { type: "malware-scan"; versionId: string }
-  | { type: "cleanup" };
+  | { type: "cleanup" }
+  | { type: "webhook-deliver"; deliveryId: string }
+  | { type: "email-send"; to: string; subject: string; text: string; html: string };
 
 @Injectable()
 export class OperationsService implements OnModuleInit, OnApplicationShutdown {
@@ -34,6 +40,10 @@ export class OperationsService implements OnModuleInit, OnApplicationShutdown {
     private readonly extraction: ContentExtractionService,
     private readonly elasticsearch: ElasticsearchService,
     private readonly config: ConfigService,
+    @Inject(forwardRef(() => WebhooksService))
+    private readonly webhooks: WebhooksService,
+    @Inject(forwardRef(() => MailService))
+    private readonly mail: MailService,
   ) {}
 
   async onModuleInit() {
@@ -95,6 +105,34 @@ export class OperationsService implements OnModuleInit, OnApplicationShutdown {
     await this.processPayload(payload);
   }
 
+  async enqueueWebhookDeliver(deliveryId: string) {
+    const payload: OperationJob = { type: "webhook-deliver", deliveryId };
+    if (this.queue) {
+      await this.queue.add("webhook-deliver", payload, {
+        attempts: 5,
+        backoff: { type: "exponential", delay: 5_000 },
+        removeOnComplete: 1000,
+        removeOnFail: 1000,
+      });
+      return;
+    }
+    setImmediate(() => void this.processPayload(payload));
+  }
+
+  async enqueueEmailSend(to: string, subject: string, text: string, html: string) {
+    const payload: OperationJob = { type: "email-send", to, subject, text, html };
+    if (this.queue) {
+      await this.queue.add("email-send", payload, {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 10_000 },
+        removeOnComplete: 500,
+        removeOnFail: 500,
+      });
+      return;
+    }
+    setImmediate(() => void this.processPayload(payload));
+  }
+
   async cleanupNow() {
     const [trash, uploads, security] = await Promise.all([
       this.cleanupTrash(),
@@ -109,10 +147,18 @@ export class OperationsService implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async processPayload(job: OperationJob) {
-    if (job.type === "malware-scan") {
-      return this.scanVersion(job.versionId);
+    switch (job.type) {
+      case "malware-scan":
+        return this.scanVersion(job.versionId);
+      case "cleanup":
+        return this.cleanupNow();
+      case "webhook-deliver":
+        return this.webhooks.deliverDirectly(job.deliveryId);
+      case "email-send":
+        return this.mail.sendMailDirect(job.to, job.subject, job.text, job.html);
+      default:
+        throw new Error("Unknown job type");
     }
-    return this.cleanupNow();
   }
 
   private async scanVersion(versionId: string) {
