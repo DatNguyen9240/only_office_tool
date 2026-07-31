@@ -13,7 +13,9 @@ import { StorageService } from "../src/storage/storage.service";
 import type { AuditService } from "../src/audit/audit.service";
 import { AdminService } from "../src/admin/admin.service";
 import { AuthService } from "../src/auth/auth.service";
-import { DocumentsService } from "../src/documents/documents.service";
+import { DocumentAccessService } from "../src/documents/document-access.service";
+import { DocumentPermissionsService } from "../src/documents/document-permissions.service";
+import { OnlyOfficeService } from "../src/documents/onlyoffice.service";
 import { FilesService } from "../src/files/files.service";
 import { FoldersService } from "../src/folders/folders.service";
 
@@ -33,11 +35,9 @@ test("permission removal cannot target another document", async () => {
       deleteMany: async () => ({ count: 0 }),
     },
   } as unknown as PrismaService;
-  const service = new DocumentsService(
+  const service = new DocumentPermissionsService(
     prisma,
-    {} as JwtService,
-    {} as ConfigService,
-    {} as StorageService,
+    new DocumentAccessService(),
   );
 
   await assert.rejects(
@@ -99,11 +99,12 @@ test("ONLYOFFICE callback rejects an invalid ticket before fetching", async () =
     get: (key: string) =>
       key === "ONLYOFFICE_JWT_SECRET" ? "dedicated-secret" : undefined,
   } as unknown as ConfigService;
-  const service = new DocumentsService(
+  const service = new OnlyOfficeService(
     {} as PrismaService,
     jwt,
     config,
     {} as StorageService,
+    new DocumentAccessService(),
   );
 
   await assert.rejects(

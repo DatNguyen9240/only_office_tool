@@ -41,6 +41,13 @@ enum PermissionRole {
   OWNER
 }
 
+enum ScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  FAILED
+}
+
 model User {
   id            String               @id @default(cuid())
   email         String               @unique
@@ -58,12 +65,27 @@ model User {
   auditLogs     AuditLog[]           @relation("AuditActor")
   folders       Folder[]             @relation("FolderOwner")
   refreshSessions RefreshSession[]
+  favorites     DocumentFavorite[]
+  passkeys      PasskeyCredential[]
+  passwordResetTokens PasswordResetToken[]
+  webauthnChallenges WebAuthnChallenge[]
+  comments      Comment[]
+  commentMentions CommentMention[]
+  notifications Notification[]
+  createdGroups Group[]                @relation("GroupCreator")
+  groupMemberships GroupMember[]
+  folderPermissions FolderPermission[]
+  templates     DocumentTemplate[]
+  webhookSubscriptions WebhookSubscription[] @relation("WebhookOwner")
 }
 
 model RefreshSession {
   id        String    @id
   userId    String
   tokenHash String
+  ip        String?
+  userAgent String?
+  lastUsedAt DateTime @default(now())
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
@@ -83,6 +105,7 @@ model Folder {
   children  Folder[]  @relation("FolderTree")
   owner     User      @relation("FolderOwner", fields: [ownerId], references: [id])
   documents Document[]
+  permissions FolderPermission[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -106,6 +129,11 @@ model Document {
   versions         DocumentVersion[]    @relation("DocumentVersions")
   permissions      DocumentPermission[]
   shareLinks       ShareLink[]
+  favorites        DocumentFavorite[]
+  comments         Comment[]
+  uploadIntents    UploadIntent[]
+  tags             DocumentTag[]
+  metadata         Json?
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
   deletedAt        DateTime?
@@ -116,6 +144,58 @@ model Document {
   @@index([deletedAt])
   @@index([deletedAt, folderId, updatedAt])
   @@index([deletedAt, name])
+}
+
+model PasskeyCredential {
+  id         String   @id
+  userId     String
+  publicKey  Bytes
+  counter    BigInt   @default(0)
+  transports String[]
+  deviceType String
+  backedUp   Boolean  @default(false)
+  name       String?
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  challenge String
+  type      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
+model DocumentFavorite {
+  id         String   @id @default(cuid())
+  documentId String
+  userId     String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@index([userId, createdAt])
 }
 
 model DocumentVersion {
@@ -130,6 +210,10 @@ model DocumentVersion {
   document     Document @relation("DocumentVersions", fields: [documentId], references: [id], onDelete: Cascade)
   currentFor   Document? @relation("CurrentDocumentVersion")
   author       User     @relation("VersionAuthor", fields: [authorId], references: [id])
+  scanStatus   ScanStatus @default(CLEAN)
+  scanMessage  String?
+  scannedAt    DateTime?
+  textContent  String?
   createdAt    DateTime @default(now())
 
   @@unique([documentId, version])
@@ -141,20 +225,192 @@ model DocumentPermission {
   documentId String
   userId     String?
   email      String?
+  groupId    String?
   role       PermissionRole
   grantedById String
   document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
   user       User?          @relation(fields: [userId], references: [id])
+  group      Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdAt  DateTime       @default(now())
 
   @@unique([documentId, email])
+  @@unique([documentId, groupId])
   @@index([userId])
+  @@index([groupId])
+}
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  color     String?
+  createdAt DateTime      @default(now())
+  documents DocumentTag[]
+}
+
+model DocumentTag {
+  documentId String
+  tagId      String
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+  @@index([tagId])
+}
+
+model DocumentTemplate {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  type        DocumentType
+  objectKey   String?
+  ownerId     String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+}
+
+model UploadIntent {
+  id                String    @id @default(cuid())
+  documentId        String
+  objectKey         String    @unique
+  expectedSizeBytes BigInt
+  contentType       String
+  expiresAt         DateTime
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  document          Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, completedAt])
+  @@index([documentId])
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   User     @relation("GroupCreator", fields: [createdById], references: [id])
+  members     GroupMember[]
+  documentPermissions DocumentPermission[]
+  folderPermissions FolderPermission[]
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String
+  userId    String
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([groupId, userId])
+  @@index([userId])
+}
+
+model FolderPermission {
+  id          String         @id @default(cuid())
+  folderId    String
+  userId      String?
+  email       String?
+  groupId     String?
+  role        PermissionRole
+  grantedById String
+  folder      Folder         @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group       Group?         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdAt   DateTime       @default(now())
+
+  @@unique([folderId, email])
+  @@unique([folderId, groupId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model Comment {
+  id         String    @id @default(cuid())
+  documentId String
+  authorId   String
+  content    String
+  resolvedAt DateTime?
+  editedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  document   Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  author     User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  mentions   CommentMention[]
+
+  @@index([documentId, createdAt])
+  @@index([authorId])
+}
+
+model CommentMention {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([commentId, userId])
+  @@index([userId])
+}
+
+model Notification {
+  id           String    @id @default(cuid())
+  userId       String
+  type         String
+  title        String
+  body         String?
+  resourceType String?
+  resourceId   String?
+  readAt       DateTime?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+model WebhookSubscription {
+  id          String   @id @default(cuid())
+  ownerId     String
+  url         String
+  secret      String
+  events      String[]
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation("WebhookOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([ownerId, active])
+}
+
+model WebhookDelivery {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  event          String
+  payload        Json
+  statusCode     Int?
+  attempts       Int      @default(0)
+  deliveredAt    DateTime?
+  nextAttemptAt  DateTime @default(now())
+  lastError      String?
+  createdAt      DateTime @default(now())
+  subscription    WebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, nextAttemptAt])
 }
 
 model ShareLink {
   id         String         @id @default(cuid())
   documentId String
   tokenHash  String         @unique
+  passwordHash String?
   permission PermissionRole @default(VIEWER)
   expiresAt  DateTime?
   createdById String

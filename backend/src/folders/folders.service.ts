@@ -1,13 +1,19 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
+import type { AuthenticatedUser } from "../auth/auth.types";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateFolderDto } from "./dto/create-folder.dto";
 import { UpdateFolderDto } from "./dto/update-folder.dto";
+import {
+  CreateFolderPermissionDto,
+  UpdateFolderPermissionDto,
+} from "./dto/folder-permission.dto";
 
 @Injectable()
 export class FoldersService {
@@ -16,10 +22,21 @@ export class FoldersService {
     @Optional() private readonly audit?: AuditService,
   ) {}
 
-  async list(ownerId: string, parentId?: string) {
+  async list(user: AuthenticatedUser, parentId?: string) {
     const folders = await this.prisma.folder.findMany({
       where: {
-        ownerId,
+        OR: [
+          { ownerId: user.id },
+          { permissions: { some: { userId: user.id } } },
+          { permissions: { some: { email: user.email } } },
+          {
+            permissions: {
+              some: {
+                group: { members: { some: { userId: user.id } } },
+              },
+            },
+          },
+        ],
         ...(parentId === undefined ? {} : { parentId: parentId || null }),
       },
       include: { _count: { select: { documents: true, children: true } } },
@@ -32,6 +49,109 @@ export class FoldersService {
       ...(folder.parentId ? { parentId: folder.parentId } : {}),
       count: folder._count.documents + folder._count.children,
     }));
+  }
+
+  async listPermissions(id: string, user: AuthenticatedUser) {
+    await this.ensureOwnedFolder(id, user);
+    const permissions = await this.prisma.folderPermission.findMany({
+      where: { folderId: id },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        group: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    return permissions.map((permission) => ({
+      id: permission.id,
+      role: permission.role,
+      email: permission.email,
+      user: permission.user,
+      group: permission.group,
+    }));
+  }
+
+  async addPermission(
+    id: string,
+    input: CreateFolderPermissionDto,
+    user: AuthenticatedUser,
+  ) {
+    const folder = await this.ensureOwnedFolder(id, user);
+    if (Boolean(input.email) === Boolean(input.groupId)) {
+      throw new BadRequestException("Provide either email or groupId");
+    }
+    if (input.groupId) {
+      const group = await this.prisma.group.findUnique({
+        where: { id: input.groupId },
+        select: { id: true },
+      });
+      if (!group) throw new NotFoundException("Group not found");
+      const permission = await this.prisma.folderPermission.upsert({
+        where: { folderId_groupId: { folderId: id, groupId: group.id } },
+        create: {
+          folderId: id,
+          groupId: group.id,
+          role: input.role,
+          grantedById: user.id,
+        },
+        update: { role: input.role, grantedById: user.id },
+      });
+      await this.record(user.id, "FOLDER_PERMISSION_GRANTED", id, folder.name);
+      return permission;
+    }
+    const email = input.email!.trim().toLowerCase();
+    const target = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+    const permission = await this.prisma.folderPermission.upsert({
+      where: { folderId_email: { folderId: id, email } },
+      create: {
+        folderId: id,
+        email,
+        userId: target?.id,
+        role: input.role,
+        grantedById: user.id,
+      },
+      update: {
+        userId: target?.id,
+        role: input.role,
+        grantedById: user.id,
+      },
+    });
+    await this.record(user.id, "FOLDER_PERMISSION_GRANTED", id, folder.name);
+    return permission;
+  }
+
+  async updatePermission(
+    id: string,
+    permissionId: string,
+    input: UpdateFolderPermissionDto,
+    user: AuthenticatedUser,
+  ) {
+    const folder = await this.ensureOwnedFolder(id, user);
+    const result = await this.prisma.folderPermission.updateMany({
+      where: { id: permissionId, folderId: id },
+      data: { role: input.role, grantedById: user.id },
+    });
+    if (result.count !== 1) throw new NotFoundException("Permission not found");
+    await this.record(user.id, "FOLDER_PERMISSION_UPDATED", id, folder.name);
+    return this.prisma.folderPermission.findUniqueOrThrow({
+      where: { id: permissionId },
+    });
+  }
+
+  async removePermission(
+    id: string,
+    permissionId: string,
+    user: AuthenticatedUser,
+  ) {
+    const folder = await this.ensureOwnedFolder(id, user);
+    const result = await this.prisma.folderPermission.deleteMany({
+      where: { id: permissionId, folderId: id },
+    });
+    if (result.count !== 1) throw new NotFoundException("Permission not found");
+    await this.record(user.id, "FOLDER_PERMISSION_REVOKED", id, folder.name);
+    return { id: permissionId, status: "removed" as const };
   }
 
   async create(input: CreateFolderDto, ownerId: string) {
@@ -89,6 +209,18 @@ export class FoldersService {
       select: { id: true },
     });
     if (!folder) throw new NotFoundException("Folder not found");
+  }
+
+  private async ensureOwnedFolder(id: string, user: AuthenticatedUser) {
+    const folder = await this.prisma.folder.findFirst({
+      where: {
+        id,
+        ...(user.role === "ADMINISTRATOR" ? {} : { ownerId: user.id }),
+      },
+      select: { id: true, name: true },
+    });
+    if (!folder) throw new NotFoundException("Folder not found");
+    return folder;
   }
 
   private async ensureValidParent(

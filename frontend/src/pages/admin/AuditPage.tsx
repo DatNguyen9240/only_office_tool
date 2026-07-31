@@ -1,4 +1,6 @@
 import {
+  AppstoreOutlined,
+  BarsOutlined,
   DownloadOutlined,
   EyeOutlined,
   SafetyCertificateOutlined,
@@ -12,9 +14,15 @@ import { useQuery } from "@tanstack/react-query";
 import {
   App,
   Button,
+  Card,
   Descriptions,
   Drawer,
+  Empty,
   Grid,
+  Input,
+  Pagination,
+  Segmented,
+  Select,
   Tag,
   Typography,
 } from "antd";
@@ -22,10 +30,19 @@ import { useMemo, useState } from "react";
 import type { AuditRecord } from "@share";
 import { apiRequest } from "@/lib/api";
 
+interface AuditFilters {
+  query: string;
+  action?: string;
+  outcome?: AuditRecord["outcome"];
+}
+
 export function AuditPage() {
   const { message } = App.useApp();
   const screens = Grid.useBreakpoint();
   const [selected, setSelected] = useState<AuditRecord>();
+  const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<AuditFilters>({ query: "" });
   const {
     data: auditRecords = [],
     isLoading,
@@ -35,6 +52,25 @@ export function AuditPage() {
     queryFn: ({ signal }) =>
       apiRequest<AuditRecord[]>("/admin/audit?limit=500", { signal }),
   });
+  const filteredAuditRecords = useMemo(
+    () =>
+      auditRecords.filter((record) => {
+        const query = filters.query.trim().toLowerCase();
+        return (
+          (!query ||
+            record.actor.toLowerCase().includes(query) ||
+            record.resource.toLowerCase().includes(query) ||
+            record.id.toLowerCase().includes(query)) &&
+          (!filters.action || record.action === filters.action) &&
+          (!filters.outcome || record.outcome === filters.outcome)
+        );
+      }),
+    [auditRecords, filters],
+  );
+  const visibleAuditRecords = filteredAuditRecords.slice(
+    (page - 1) * 10,
+    page * 10,
+  );
 
   const columns = useMemo<ProColumns<AuditRecord>[]>(
     () => [
@@ -181,22 +217,153 @@ export function AuditPage() {
           </Typography.Text>
         </div>
       </div>
-      <ProTable<AuditRecord>
-        className="audit-table"
-        rowKey="id"
-        columns={columns}
-        dataSource={auditRecords}
-        loading={isLoading}
-        scroll={{ x: "max-content" }}
-        options={{
-          density: false,
-          fullScreen: true,
-          reload: () => void refetch(),
-        }}
-        search={{ labelWidth: "auto", defaultCollapsed: !screens.lg }}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-        toolbar={{ title: "Events" }}
-      />
+      <div className="admin-record-surface">
+        <div className="admin-record-toolbar">
+          <Typography.Text strong>Events</Typography.Text>
+          <Segmented
+            size="small"
+            aria-label="Audit event view"
+            value={viewMode}
+            options={[
+              { value: "table", icon: <BarsOutlined />, label: "Table" },
+              { value: "card", icon: <AppstoreOutlined />, label: "Cards" },
+            ]}
+            onChange={(value) => {
+              setViewMode(value as "table" | "card");
+              setPage(1);
+            }}
+          />
+        </div>
+        <div
+          className="admin-filter-bar audit-filter-bar"
+          role="search"
+          aria-label="Filter audit events"
+        >
+          <Input
+            allowClear
+            value={filters.query}
+            placeholder="Search actor, resource, or event ID"
+            onChange={(event) => {
+              setFilters((current) => ({ ...current, query: event.target.value }));
+              setPage(1);
+            }}
+          />
+          <Select
+            allowClear
+            value={filters.action}
+            placeholder="Action"
+            options={[...new Set(auditRecords.map((record) => record.action))].map(
+              (value) => ({ label: formatAction(value), value }),
+            )}
+            onChange={(value) => {
+              setFilters((current) => ({ ...current, action: value }));
+              setPage(1);
+            }}
+          />
+          <Select
+            allowClear
+            value={filters.outcome}
+            placeholder="Outcome"
+            options={[
+              { label: "Success", value: "SUCCESS" },
+              { label: "Denied", value: "DENIED" },
+              { label: "Failed", value: "FAILED" },
+            ]}
+            onChange={(value) => {
+              setFilters((current) => ({ ...current, outcome: value }));
+              setPage(1);
+            }}
+          />
+          <Button
+            type="text"
+            disabled={!filters.query && !filters.action && !filters.outcome}
+            onClick={() => {
+              setFilters({ query: "" });
+              setPage(1);
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+        {viewMode === "table" ? (
+          <ProTable<AuditRecord>
+            className="audit-table"
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredAuditRecords}
+            loading={isLoading}
+            size="small"
+            scroll={{ x: "max-content" }}
+            options={{
+              density: false,
+              fullScreen: true,
+              reload: () => void refetch(),
+            }}
+            search={false}
+            pagination={{ pageSize: 10, showSizeChanger: false }}
+            toolbar={{ title: undefined }}
+          />
+        ) : (
+          <>
+            {isLoading ? (
+              <div className="admin-card-loading">Loading events…</div>
+            ) : visibleAuditRecords.length ? (
+              <div className="admin-card-grid">
+                {visibleAuditRecords.map((record) => (
+                  <Card key={record.id} size="small" className="admin-record-card">
+                    <div className="admin-card-heading">
+                      <span className="admin-card-title">
+                        <Typography.Text strong>{formatAction(record.action)}</Typography.Text>
+                        <Typography.Text type="secondary">
+                          {new Date(record.timestamp).toLocaleString()}
+                        </Typography.Text>
+                      </span>
+                      <Tag color={record.outcome === "SUCCESS" ? "green" : "red"}>
+                        {formatAction(record.outcome)}
+                      </Tag>
+                    </div>
+                    <div className="admin-card-fields">
+                      <span>
+                        <Typography.Text type="secondary">Actor</Typography.Text>
+                        <Typography.Text ellipsis>{record.actor}</Typography.Text>
+                      </span>
+                      <span>
+                        <Typography.Text type="secondary">Resource</Typography.Text>
+                        <Typography.Text ellipsis>{record.resource}</Typography.Text>
+                      </span>
+                      <span>
+                        <Typography.Text type="secondary">Event ID</Typography.Text>
+                        <Typography.Text copyable={{ text: record.id }} ellipsis>
+                          {record.id}
+                        </Typography.Text>
+                      </span>
+                    </div>
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={() => setSelected(record)}
+                    >
+                      View details
+                    </Button>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No events found" />
+            )}
+            <Pagination
+              className="admin-card-pagination"
+              current={page}
+              pageSize={10}
+              total={filteredAuditRecords.length}
+              showSizeChanger={false}
+              hideOnSinglePage
+              onChange={setPage}
+            />
+          </>
+        )}
+      </div>
       <Drawer
         open={Boolean(selected)}
         title="Audit event details"

@@ -2,7 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { DocumentItem } from "@share";
 import { apiRequest } from "@/lib/api";
 
-export function useDocuments(scope: "all" | "shared" | "trash" = "all") {
+export type DocumentScope =
+  | "all"
+  | "shared"
+  | "trash"
+  | "recent"
+  | "favorites";
+
+export function useDocuments(scope: DocumentScope = "all") {
   return useQuery({
     queryKey: ["documents", scope],
     queryFn: ({ signal }): Promise<DocumentItem[]> =>

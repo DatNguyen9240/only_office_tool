@@ -8,11 +8,14 @@ import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
 import { JwtStrategy } from "./strategies/jwt.strategy";
+import { PasskeyService } from "./passkey.service";
+import { MailModule } from "../mail/mail.module";
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: "jwt" }),
     JwtModule.register({}),
+    MailModule,
   ],
   controllers: [AuthController],
   providers: [
@@ -22,6 +25,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
     JwtAuthGuard,
     JwtRefreshGuard,
     RolesGuard,
+    PasskeyService,
   ],
   exports: [AuthService, JwtAuthGuard, RolesGuard],
 })

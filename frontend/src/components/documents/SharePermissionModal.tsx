@@ -28,6 +28,12 @@ interface SharePermissionModalProps {
   onClose: () => void;
 }
 
+interface GroupOption {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
 export function SharePermissionModal({
   open,
   document,
@@ -39,6 +45,9 @@ export function SharePermissionModal({
   const [entries, setEntries] = useState<PermissionEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const recipientType = Form.useWatch("recipientType", form) ?? "user";
   const permissionOptions = ["Viewer", "Commenter", "Editor", "Owner"].map((role) => {
     const keys = {
       Viewer: "role.viewer",
@@ -65,9 +74,15 @@ export function SharePermissionModal({
       .finally(() => setLoading(false));
   }, [document?.id, locale, message, open]);
 
+  useEffect(() => {
+    if (!open) return;
+    apiRequest<GroupOption[]>("/groups")
+      .then(setGroups)
+      .catch(() => setGroups([]));
+  }, [open]);
+
   const invite = async () => {
     const values = await form.validateFields();
-    const email = String(values.email);
     if (!document?.id) return;
     setSaving(true);
     try {
@@ -76,14 +91,18 @@ export function SharePermissionModal({
         `/documents/${document.id}/permissions`,
         {
           method: "POST",
-          body: JSON.stringify({ email, role }),
+          body: JSON.stringify(
+            values.recipientType === "group"
+              ? { groupId: values.groupId, role }
+              : { email: values.email, role },
+          ),
         },
       );
       setEntries((current) => [
         ...current.filter((entry) => entry.id !== created.id),
         created,
       ]);
-      form.resetFields(["email"]);
+      form.resetFields(["email", "groupId"]);
       message.success(t("share.sent"));
     } catch (error) {
       const text = error instanceof Error ? error.message : "Failed to grant access";
@@ -125,6 +144,27 @@ export function SharePermissionModal({
     }
   };
 
+  const createShareLink = async () => {
+    if (!document?.id) return;
+    setLinkLoading(true);
+    try {
+      const link = await apiRequest<{ url: string }>(
+        `/documents/${document.id}/share-links`,
+        {
+          method: "POST",
+          body: JSON.stringify({ permission: "VIEWER" }),
+        },
+      );
+      await navigator.clipboard.writeText(link.url);
+      message.success("View-only link copied");
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Failed to create share link";
+      message.error(translateApiError(text, locale));
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
   return (
     <Modal
       open={open}
@@ -151,7 +191,8 @@ export function SharePermissionModal({
         <Button
           key="copy"
           icon={<LinkOutlined />}
-          disabled
+          loading={linkLoading}
+          onClick={() => void createShareLink()}
         >
           {t("share.copy")}
         </Button>,
@@ -163,19 +204,45 @@ export function SharePermissionModal({
       <Form
         form={form}
         layout="vertical"
-        initialValues={{ role: "Viewer" }}
+        initialValues={{ role: "Viewer", recipientType: "user" }}
         className="share-form"
       >
-        <Form.Item
-          label={t("share.invite")}
-          name="email"
-          rules={[
-            { required: true, message: t("share.emailRequired") },
-            { type: "email", message: t("share.emailInvalid") },
-          ]}
-        >
-          <Input placeholder={t("share.emailPlaceholder")} prefix={<UserAddOutlined />} />
+        <Form.Item label="Recipient type" name="recipientType">
+          <Select
+            options={[
+              { value: "user", label: "Person" },
+              { value: "group", label: "Group" },
+            ]}
+          />
         </Form.Item>
+        {recipientType === "group" ? (
+          <Form.Item
+            label="Group"
+            name="groupId"
+            rules={[{ required: true, message: "Choose a group" }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Choose a group"
+              options={groups.map((group) => ({
+                value: group.id,
+                label: `${group.name} (${group.memberCount})`,
+              }))}
+            />
+          </Form.Item>
+        ) : (
+          <Form.Item
+            label={t("share.invite")}
+            name="email"
+            rules={[
+              { required: true, message: t("share.emailRequired") },
+              { type: "email", message: t("share.emailInvalid") },
+            ]}
+          >
+            <Input placeholder={t("share.emailPlaceholder")} prefix={<UserAddOutlined />} />
+          </Form.Item>
+        )}
         <Form.Item label={t("share.permission")} name="role">
           <Select
             options={permissionOptions.filter((option) => option.value !== "Owner")}
@@ -237,7 +304,7 @@ export function SharePermissionModal({
             <List.Item.Meta
               avatar={<Avatar className="permission-avatar">{entry.initials}</Avatar>}
               title={entry.name}
-              description={entry.email}
+              description={entry.kind === "group" ? "Group" : entry.email}
             />
           </List.Item>
         )}

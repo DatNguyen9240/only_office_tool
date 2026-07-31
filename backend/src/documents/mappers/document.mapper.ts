@@ -40,7 +40,16 @@ export class DocumentMapper {
         take: 1,
         select: { role: true },
       },
+      favorites: {
+        where: { userId: user.id },
+        take: 1,
+        select: { id: true },
+      },
       _count: { select: { permissions: true } },
+      tags: {
+        include: { tag: true },
+        orderBy: { createdAt: "asc" as const },
+      },
     } satisfies Prisma.DocumentInclude;
   }
 
@@ -65,13 +74,19 @@ export class DocumentMapper {
       status: publicStatus(document.status),
       folderId: document.folder?.id ?? "all",
       shared: document._count.permissions > 0,
-      ...(document.starred ? { starred: true } : {}),
+      ...(document.favorites.length > 0 ? { starred: true } : {}),
       ...(document.deletedAt
         ? { deletedAt: document.deletedAt.toISOString() }
         : {}),
       ...(permission
         ? { permission: DocumentMapper.formatPermissionRole(permission) }
         : {}),
+      metadata: document.metadata as Record<string, unknown> | null,
+      tags: document.tags.map((item) => ({
+        id: item.tag.id,
+        name: item.tag.name,
+        color: item.tag.color,
+      })),
     };
   }
 }

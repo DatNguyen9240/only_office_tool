@@ -15,6 +15,8 @@ export interface DocumentItem {
   starred?: boolean;
   deletedAt?: string;
   permission?: PermissionRole;
+  metadata?: Record<string, unknown> | null;
+  tags?: Array<{ id: string; name: string; color?: string | null }>;
 }
 
 export interface FolderItem {
@@ -30,6 +32,8 @@ export interface PermissionEntry {
   email: string;
   role: PermissionRole;
   initials: string;
+  kind?: "user" | "group";
+  groupId?: string;
 }
 
 export interface VersionEntry {
@@ -72,6 +76,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: AuthRole;
+  department?: string | null;
 }
 
 export interface AuthTokensResponse {

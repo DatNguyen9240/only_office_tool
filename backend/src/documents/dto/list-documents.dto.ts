@@ -5,12 +5,14 @@ export enum DocumentScope {
   ALL = "all",
   SHARED = "shared",
   TRASH = "trash",
+  RECENT = "recent",
+  FAVORITES = "favorites",
 }
 
 export class ListDocumentsQueryDto {
   @IsOptional()
   @IsEnum(DocumentScope, {
-    message: "scope must be all, shared, or trash",
+    message: "scope must be all, shared, trash, recent, or favorites",
   })
   scope?: DocumentScope = DocumentScope.ALL;
 

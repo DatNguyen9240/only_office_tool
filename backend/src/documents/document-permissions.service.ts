@@ -1,12 +1,14 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
 } from "@nestjs/common";
 import { PermissionRole, Prisma } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
+import { NotificationsService } from "../notifications/notifications.service";
 import { PrismaService } from "../prisma/prisma.service";
-import { DocumentAccessService, AuditAction } from "./document-access.service";
+import { AuditAction, DocumentAccessService } from "./document-access.service";
 import {
   CreatePermissionDto,
   UpdatePermissionDto,
@@ -19,13 +21,17 @@ export class DocumentPermissionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly accessService: DocumentAccessService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async listPermissions(id: string, user: AuthenticatedUser) {
-    const document = await this.ensureOwnedDocument(id, user);
+    await this.ensureOwnedDocument(id, user);
     const permissions = await this.prisma.documentPermission.findMany({
       where: { documentId: id },
-      include: { user: { select: { name: true } } },
+      include: {
+        user: { select: { name: true } },
+        group: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: "asc" },
     });
     return permissions.map((permission) => this.toPermissionEntry(permission));
@@ -37,22 +43,57 @@ export class DocumentPermissionsService {
     user: AuthenticatedUser,
   ) {
     const document = await this.ensureOwnedDocument(id, user);
+    if (Boolean(input.email) === Boolean(input.groupId)) {
+      throw new BadRequestException("Provide either email or groupId");
+    }
 
+    if (input.groupId) {
+      const group = await this.prisma.group.findUnique({
+        where: { id: input.groupId },
+        include: { members: { select: { userId: true } } },
+      });
+      if (!group) throw new NotFoundException("Group not found");
+      const permission = await this.prisma.documentPermission.upsert({
+        where: {
+          documentId_groupId: { documentId: id, groupId: group.id },
+        },
+        create: {
+          documentId: id,
+          groupId: group.id,
+          role: input.role,
+          grantedById: user.id,
+        },
+        update: { role: input.role, grantedById: user.id },
+        include: {
+          user: { select: { name: true } },
+          group: { select: { id: true, name: true } },
+        },
+      });
+      await this.notifications.createMany(
+        group.members
+          .filter((member) => member.userId !== user.id)
+          .map((member) => ({
+            userId: member.userId,
+            type: "DOCUMENT_SHARED",
+            title: `${document.name} was shared with ${group.name}`,
+            resourceType: "DOCUMENT",
+            resourceId: id,
+          })),
+      );
+      this.recordGrant(user.id, id, document.name);
+      return this.toPermissionEntry(permission);
+    }
+
+    const email = input.email!.trim().toLowerCase();
     const targetUser = await this.prisma.user.findUnique({
-      where: { email: input.email },
+      where: { email },
       select: { id: true },
     });
-
     const permission = await this.prisma.documentPermission.upsert({
-      where: {
-        documentId_email: {
-          documentId: id,
-          email: input.email,
-        },
-      },
+      where: { documentId_email: { documentId: id, email } },
       create: {
         documentId: id,
-        email: input.email,
+        email,
         userId: targetUser?.id ?? null,
         role: input.role,
         grantedById: user.id,
@@ -62,15 +103,21 @@ export class DocumentPermissionsService {
         role: input.role,
         grantedById: user.id,
       },
-      include: { user: { select: { name: true } } },
+      include: {
+        user: { select: { name: true } },
+        group: { select: { id: true, name: true } },
+      },
     });
-
-    this.accessService.recordAuditAsync(
-      user.id,
-      AuditAction.PERMISSION_GRANTED,
-      id,
-      document.name,
-    );
+    if (targetUser?.id && targetUser.id !== user.id) {
+      await this.notifications.create({
+        userId: targetUser.id,
+        type: "DOCUMENT_SHARED",
+        title: `${document.name} was shared with you`,
+        resourceType: "DOCUMENT",
+        resourceId: id,
+      });
+    }
+    this.recordGrant(user.id, id, document.name);
     return this.toPermissionEntry(permission);
   }
 
@@ -81,14 +128,15 @@ export class DocumentPermissionsService {
     user: AuthenticatedUser,
   ) {
     const document = await this.ensureOwnedDocument(id, user);
-
     try {
       const permission = await this.prisma.documentPermission.update({
         where: { id: permissionId, documentId: id },
         data: { role: input.role, grantedById: user.id },
-        include: { user: { select: { name: true } } },
+        include: {
+          user: { select: { name: true } },
+          group: { select: { id: true, name: true } },
+        },
       });
-
       this.accessService.recordAuditAsync(
         user.id,
         AuditAction.PERMISSION_UPDATED,
@@ -139,28 +187,53 @@ export class DocumentPermissionsService {
     email: string | null;
     role: PermissionRole;
     user: { name: string } | null;
+    group?: { id: string; name: string } | null;
   }) {
+    if (permission.group) {
+      return {
+        id: permission.id,
+        name: permission.group.name,
+        email: "",
+        groupId: permission.group.id,
+        kind: "group" as const,
+        role: this.toPublicPermission(permission.role),
+        initials: this.initials(permission.group.name, "GR"),
+      };
+    }
     const email = permission.email?.trim() ?? "";
     const fallbackName = email.includes("@")
       ? email.split("@")[0]
       : email || "Unknown User";
     const displayName = permission.user?.name?.trim() || fallbackName;
-
-    const initials = displayName
-      .split(/\s+/)
-      .filter((part) => part.length > 0)
-      .map((part) => part.charAt(0))
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-
     return {
       id: permission.id,
       name: displayName,
       email,
+      kind: "user" as const,
       role: this.toPublicPermission(permission.role),
-      initials: initials || "US",
+      initials: this.initials(displayName, "US"),
     };
+  }
+
+  private initials(name: string, fallback: string) {
+    return (
+      name
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((part) => part.charAt(0))
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || fallback
+    );
+  }
+
+  private recordGrant(actorId: string, id: string, name: string) {
+    this.accessService.recordAuditAsync(
+      actorId,
+      AuditAction.PERMISSION_GRANTED,
+      id,
+      name,
+    );
   }
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {

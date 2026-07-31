@@ -7,7 +7,6 @@ import {
   HttpStatus,
   Param,
   ParseIntPipe,
-  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -56,7 +55,7 @@ export class DocumentsController {
 
   @Get(":id")
   get(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.getById(id, user);
@@ -64,7 +63,7 @@ export class DocumentsController {
 
   @Get(":id/editor-config")
   getEditorConfig(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.onlyOfficeService.getEditorConfig(id, user);
@@ -72,7 +71,7 @@ export class DocumentsController {
 
   @Get(":id/permissions")
   listPermissions(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.permissionsService.listPermissions(id, user);
@@ -80,7 +79,7 @@ export class DocumentsController {
 
   @Post(":id/permissions")
   addPermission(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @Body() input: CreatePermissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -89,8 +88,8 @@ export class DocumentsController {
 
   @Patch(":id/permissions/:permissionId")
   updatePermission(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Param("permissionId", new ParseUUIDPipe({ version: "4" })) permissionId: string,
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string,
     @Body() input: UpdatePermissionDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -99,8 +98,8 @@ export class DocumentsController {
 
   @Delete(":id/permissions/:permissionId")
   removePermission(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
-    @Param("permissionId", new ParseUUIDPipe({ version: "4" })) permissionId: string,
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.permissionsService.removePermission(id, permissionId, user);
@@ -108,15 +107,25 @@ export class DocumentsController {
 
   @Get(":id/versions")
   getVersions(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.versionsService.getVersions(id, user);
   }
 
+  @Get(":id/versions/compare")
+  compareVersions(
+    @Param("id") id: string,
+    @Query("from", ParsePositiveIntPipe) from: number,
+    @Query("to", ParsePositiveIntPipe) to: number,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.versionsService.compareVersions(id, from, to, user);
+  }
+
   @Get(":id/versions/:versionNumber/download-url")
   downloadVersion(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @Param("versionNumber", ParsePositiveIntPipe) versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -125,7 +134,7 @@ export class DocumentsController {
 
   @Post(":id/versions/:versionNumber/restore")
   restoreVersion(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @Param("versionNumber", ParsePositiveIntPipe) versionNumber: number,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -134,7 +143,7 @@ export class DocumentsController {
 
   @Patch(":id")
   update(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @Body() input: UpdateDocumentDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
@@ -143,7 +152,7 @@ export class DocumentsController {
 
   @Delete(":id")
   remove(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.softDelete(id, user);
@@ -151,7 +160,7 @@ export class DocumentsController {
 
   @Delete(":id/permanent")
   removePermanently(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.permanentDelete(id, user);
@@ -167,7 +176,7 @@ export class DocumentsController {
 
   @Post(":id/restore")
   restore(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.restore(id, user);
@@ -175,7 +184,7 @@ export class DocumentsController {
 
   @Post(":id/star")
   star(
-    @Param("id", new ParseUUIDPipe({ version: "4" })) id: string,
+    @Param("id") id: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.toggleStar(id, user);

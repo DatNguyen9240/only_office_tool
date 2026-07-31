@@ -19,6 +19,7 @@ import { apiRequest } from "@/lib/api";
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
+  directory?: boolean;
 }
 
 interface UploadUrlResponse {
@@ -41,7 +42,7 @@ function contentTypeFor(file: File) {
   return supportedTypes[extension];
 }
 
-export function UploadModal({ open, onClose }: UploadModalProps) {
+export function UploadModal({ open, onClose, directory = false }: UploadModalProps) {
   const { message } = App.useApp();
   const { locale, t } = useI18n();
   const queryClient = useQueryClient();
@@ -182,7 +183,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
     <Modal
       destroyOnHidden
       open={open}
-      title={t("upload.title")}
+      title={directory ? "Upload folder" : t("upload.title")}
       width={600}
       onCancel={cancel}
       footer={[
@@ -213,6 +214,7 @@ export function UploadModal({ open, onClose }: UploadModalProps) {
         <Form.Item label={t("upload.files")} required>
           <Upload.Dragger
             accept=".docx,.xlsx,.pptx,.pdf"
+            directory={directory}
             beforeUpload={() => false}
             fileList={files}
             multiple

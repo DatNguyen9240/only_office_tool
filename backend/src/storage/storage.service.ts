@@ -240,6 +240,21 @@ export class StorageService {
     return response.Body;
   }
 
+  async getObjectBuffer(objectKey: string, range?: string) {
+    this.ensureConfigured();
+    const response = await this.internalClient.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        ...(range ? { Range: range } : {}),
+      }),
+    );
+    if (!response.Body) {
+      throw new ServiceUnavailableException("Object body is unavailable");
+    }
+    return Buffer.from(await response.Body.transformToByteArray());
+  }
+
   private ensureConfigured() {
     if (!this.configured()) {
       throw new ServiceUnavailableException("Object storage is not configured");

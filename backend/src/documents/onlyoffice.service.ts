@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
-import { PermissionRole } from "@prisma/client";
+import { DocumentStatus, PermissionRole, ScanStatus } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
@@ -21,6 +21,7 @@ import { validateFileMagicBytes } from "../common/utils/file-signature.util";
 import { DocumentAuditListener } from "./listeners/document-audit.listener";
 import { DocumentAuditEvent } from "./events/document-audit.event";
 import { getDocumentType } from "./utils/document-type.util";
+import { OperationsService } from "../operations/operations.service";
 
 interface OnlyOfficeTicket {
   type: "onlyoffice-callback";
@@ -39,6 +40,7 @@ export class OnlyOfficeService implements OnModuleInit {
     private readonly storage: StorageService,
     private readonly accessService: DocumentAccessService,
     @Optional() private readonly auditListener?: DocumentAuditListener,
+    @Optional() private readonly operations?: OperationsService,
   ) {}
 
   onModuleInit() {
@@ -253,17 +255,22 @@ export class OnlyOfficeService implements OnModuleInit {
             objectKey,
             sizeBytes: BigInt(buffer.length),
             authorId: principal.userId,
+            scanStatus: ScanStatus.PENDING,
           },
           select: { id: true, version: true },
         });
 
         await tx.document.update({
           where: { id },
-          data: { currentVersionId: created.id },
+          data: {
+            currentVersionId: created.id,
+            status: DocumentStatus.REVIEW,
+          },
         });
 
         return created;
       });
+      await this.operations?.enqueueMalwareScan(createdVersion.id);
     } catch (dbError) {
       try {
         await this.storage.deleteObjects([objectKey]);

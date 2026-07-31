@@ -1,5 +1,5 @@
 import { Transform } from "class-transformer";
-import { IsEmail, IsIn } from "class-validator";
+import { IsEmail, IsIn, IsOptional, IsString } from "class-validator";
 import { PermissionRole } from "@prisma/client";
 
 const assignableRoles = [
@@ -12,8 +12,13 @@ export class CreatePermissionDto {
   @Transform(({ value }) =>
     typeof value === "string" ? value.trim().toLowerCase() : value,
   )
+  @IsOptional()
   @IsEmail()
-  email!: string;
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  groupId?: string;
 
   @IsIn(assignableRoles)
   role!: (typeof assignableRoles)[number];

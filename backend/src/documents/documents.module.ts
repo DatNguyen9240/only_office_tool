@@ -10,10 +10,27 @@ import { DocumentVersionsService } from "./document-versions.service";
 import { OnlyOfficeController } from "./onlyoffice.controller";
 import { OnlyOfficeService } from "./onlyoffice.service";
 import { DocumentAuditListener } from "./listeners/document-audit.listener";
+import { ShareLinksController } from "./share-links.controller";
+import { ShareLinksService } from "./share-links.service";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { DocumentCommentsController } from "./document-comments.controller";
+import { DocumentCommentsService } from "./document-comments.service";
+import { OperationsModule } from "../operations/operations.module";
 
 @Module({
-  imports: [PrismaModule, StorageModule, JwtModule.register({})],
-  controllers: [DocumentsController, OnlyOfficeController],
+  imports: [
+    PrismaModule,
+    StorageModule,
+    NotificationsModule,
+    OperationsModule,
+    JwtModule.register({}),
+  ],
+  controllers: [
+    DocumentsController,
+    OnlyOfficeController,
+    ShareLinksController,
+    DocumentCommentsController,
+  ],
   providers: [
     DocumentsService,
     DocumentAccessService,
@@ -21,6 +38,8 @@ import { DocumentAuditListener } from "./listeners/document-audit.listener";
     DocumentVersionsService,
     OnlyOfficeService,
     DocumentAuditListener,
+    ShareLinksService,
+    DocumentCommentsService,
   ],
   exports: [
     DocumentsService,

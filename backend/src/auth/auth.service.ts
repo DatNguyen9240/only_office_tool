@@ -1,12 +1,14 @@
 import {
+  BadRequestException,
   Injectable,
+  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { UserStatus, type UserRole } from "@prisma/client";
 import { compare, hash } from "bcryptjs";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import type {
@@ -16,6 +18,13 @@ import type {
   RefreshTokenPayload,
 } from "./auth.types";
 import { LoginDto } from "./dto/login.dto";
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  UpdateProfileDto,
+} from "./dto/account.dto";
+import { MailService } from "../mail/mail.service";
 
 interface TokenUser {
   id: string;
@@ -41,6 +50,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
     config: ConfigService,
+    @Optional() private readonly mail?: MailService,
   ) {
     this.accessSecret = config.getOrThrow<string>("JWT_ACCESS_SECRET");
     this.refreshSecret = config.getOrThrow<string>("JWT_REFRESH_SECRET");
@@ -82,7 +92,7 @@ export class AuthService {
       throw new UnauthorizedException("Email or password is incorrect");
     }
 
-    const response = await this.createSession(user);
+    const response = await this.createSession(user, context);
     await this.audit.record({
       actorId: user.id,
       action: "LOGIN",
@@ -135,6 +145,7 @@ export class AuthService {
       data: {
         tokenHash: this.hashToken(tokens.refreshToken),
         expiresAt: tokens.refreshExpiresAt,
+        lastUsedAt: new Date(),
       },
     });
     if (updated.count !== 1) {
@@ -170,7 +181,137 @@ export class AuthService {
   }
 
   me(user: AuthenticatedUser) {
-    return user;
+    return this.prisma.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        department: true,
+      },
+    });
+  }
+
+  async updateProfile(user: AuthenticatedUser, input: UpdateProfileDto) {
+    return this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        name: input.name.trim(),
+        department:
+          input.department === undefined
+            ? undefined
+            : input.department.trim() || null,
+      },
+      select: { id: true, email: true, name: true, role: true, department: true },
+    });
+  }
+
+  async changePassword(user: AuthenticatedUser, input: ChangePasswordDto) {
+    const account = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { passwordHash: true },
+    });
+    if (
+      !account?.passwordHash ||
+      !(await compare(input.currentPassword, account.passwordHash))
+    ) {
+      throw new UnauthorizedException("Current password is incorrect");
+    }
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: await hash(input.newPassword, 12) },
+      }),
+      this.prisma.refreshSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+    return { status: "password_changed" as const };
+  }
+
+  async listSessions(user: AuthenticatedUser) {
+    const sessions = await this.prisma.refreshSession.findMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { lastUsedAt: "desc" },
+      select: {
+        id: true,
+        ip: true,
+        userAgent: true,
+        lastUsedAt: true,
+        createdAt: true,
+        expiresAt: true,
+      },
+    });
+    return sessions.map((session) => ({
+      ...session,
+      lastUsedAt: session.lastUsedAt.toISOString(),
+      createdAt: session.createdAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+    }));
+  }
+
+  async revokeSession(user: AuthenticatedUser, sessionId: string) {
+    const result = await this.prisma.refreshSession.updateMany({
+      where: { id: sessionId, userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (result.count !== 1) throw new BadRequestException("Session not found");
+    return { id: sessionId, status: "revoked" as const };
+  }
+
+  async forgotPassword(input: ForgotPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: input.email.trim().toLowerCase() },
+      select: { id: true },
+    });
+    if (!user) return { status: "accepted" as const };
+    const token = randomBytes(32).toString("base64url");
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashToken(token),
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+      },
+    });
+    const webAppUrl = process.env.WEB_APP_URL ?? "http://localhost:5173";
+    await this.mail?.sendPasswordReset(
+      input.email.trim().toLowerCase(),
+      `${webAppUrl.replace(/\/$/, "")}/reset-password?token=${encodeURIComponent(token)}`,
+    );
+    return {
+      status: "accepted" as const,
+      ...(process.env.NODE_ENV === "production" ? {} : { token }),
+    };
+  }
+
+  async resetPassword(input: ResetPasswordDto) {
+    const token = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash: this.hashToken(input.token) },
+    });
+    if (!token || token.usedAt || token.expiresAt <= new Date()) {
+      throw new BadRequestException("Password reset token is invalid or expired");
+    }
+    await this.prisma.$transaction([
+      this.prisma.passwordResetToken.update({
+        where: { id: token.id },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: token.userId },
+        data: { passwordHash: await hash(input.password, 12) },
+      }),
+      this.prisma.refreshSession.updateMany({
+        where: { userId: token.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+    return { status: "password_reset" as const };
   }
 
   async setPassword(userId: string, password: string) {
@@ -181,7 +322,11 @@ export class AuthService {
     });
   }
 
-  private async createSession(user: TokenUser) {
+  createPasskeySession(user: TokenUser, context: RequestContext = {}) {
+    return this.createSession(user, context);
+  }
+
+  private async createSession(user: TokenUser, context: RequestContext = {}) {
     const sessionId = randomUUID();
     const tokens = await this.signTokens(user, sessionId);
     await this.prisma.$transaction([
@@ -191,6 +336,8 @@ export class AuthService {
           userId: user.id,
           tokenHash: this.hashToken(tokens.refreshToken),
           expiresAt: tokens.refreshExpiresAt,
+          ip: context.ip,
+          userAgent: context.userAgent,
         },
       }),
       this.prisma.user.update({

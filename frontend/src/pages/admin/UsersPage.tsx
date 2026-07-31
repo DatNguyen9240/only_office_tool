@@ -1,4 +1,6 @@
 import {
+  AppstoreOutlined,
+  BarsOutlined,
   EditOutlined,
   LockOutlined,
   MoreOutlined,
@@ -20,13 +22,19 @@ import {
   App,
   Avatar,
   Button,
+  Card,
   Dropdown,
+  Empty,
+  Input,
+  Pagination,
+  Segmented,
+  Select,
   Space,
   Statistic,
   Tag,
   Typography,
 } from "antd";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { UserRecord, UserRole, UserStatus } from "@share";
 import { useI18n } from "@/i18n";
 import { apiRequest } from "@/lib/api";
@@ -41,11 +49,22 @@ const statusColors: Record<UserStatus, string> = {
   INVITED: "gold",
   SUSPENDED: "red",
 };
+
+interface UserFilters {
+  query: string;
+  department?: string;
+  role?: UserRole;
+  status?: UserStatus;
+}
+
 export function UsersPage() {
   const { message, modal } = App.useApp();
   const { t } = useI18n();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord>();
+  const [viewMode, setViewMode] = useState<"table" | "card">("table");
+  const [page, setPage] = useState(1);
+  const [filters, setFilters] = useState<UserFilters>({ query: "" });
   const roleLabels: Record<UserRole, string> = {
     EMPLOYEE: t("admin.employee"),
     MANAGER: t("admin.manager"),
@@ -82,6 +101,85 @@ export function UsersPage() {
     queryFn: ({ signal }) =>
       apiRequest<UserRecord[]>("/admin/users?limit=500", { signal }),
   });
+  const filteredUsers = useMemo(
+    () =>
+      users.filter((user) => {
+        const query = filters.query.trim().toLowerCase();
+        const department = (filters.department ?? "").trim().toLowerCase();
+        return (
+          (!query ||
+            user.name.toLowerCase().includes(query) ||
+            user.email.toLowerCase().includes(query)) &&
+          (!department ||
+            (user.department ?? "").toLowerCase().includes(department)) &&
+          (!filters.role || user.role === filters.role) &&
+          (!filters.status || user.status === filters.status)
+        );
+      }),
+    [filters, users],
+  );
+  const visibleUsers = filteredUsers.slice((page - 1) * 10, page * 10);
+
+  const renderActions = (record: UserRecord) => (
+    <Dropdown
+      menu={{
+        items: [
+          {
+            key: "edit",
+            label: "Edit user",
+            icon: <EditOutlined />,
+            onClick: () => {
+              setEditingUser(record);
+              setModalOpen(true);
+            },
+          },
+          {
+            key: "reset",
+            label: "Revoke all sessions",
+            icon: <UserSwitchOutlined />,
+            onClick: () =>
+              modal.confirm({
+                title: "Revoke all sessions?",
+                content: `${record.name} will need to sign in again on every device.`,
+                okText: "Revoke sessions",
+                onOk: async () => {
+                  await apiRequest(`/admin/users/${record.id}/reset-sessions`, {
+                    method: "POST",
+                  });
+                  message.success("All active sessions were revoked");
+                },
+              }),
+          },
+          { type: "divider" },
+          {
+            key: "suspend",
+            label: "Suspend account",
+            icon: <LockOutlined />,
+            danger: true,
+            disabled: record.status === "SUSPENDED",
+            onClick: () =>
+              modal.confirm({
+                title: "Suspend this account?",
+                content: `${record.name} will lose access and all active sessions will be revoked.`,
+                okText: "Suspend",
+                okButtonProps: { danger: true },
+                onOk: async () => {
+                  await updateUser(record, { status: "SUSPENDED" });
+                  message.success("Account suspended");
+                },
+              }),
+          },
+        ],
+      }}
+    >
+      <Button
+        type="text"
+        size="small"
+        icon={<MoreOutlined />}
+        aria-label={`Actions for ${record.name}`}
+      />
+    </Dropdown>
+  );
 
   const updateUser = async (
     user: UserRecord,
@@ -115,7 +213,7 @@ export function UsersPage() {
       title: "Department",
       dataIndex: "department",
       width: 150,
-      renderText: (value) => value || "—",
+      renderText: (value) => value || "Not set",
     },
     {
       title: "Role",
@@ -152,65 +250,7 @@ export function UsersPage() {
       valueType: "option",
       width: 72,
       render: (_, record) => [
-        <Dropdown
-          key="actions"
-          menu={{
-            items: [
-              {
-                key: "edit",
-                label: "Edit user",
-                icon: <EditOutlined />,
-                onClick: () => {
-                  setEditingUser(record);
-                  setModalOpen(true);
-                },
-              },
-              {
-                key: "reset",
-                label: "Revoke all sessions",
-                icon: <UserSwitchOutlined />,
-                onClick: () =>
-                  modal.confirm({
-                    title: "Revoke all sessions?",
-                    content: `${record.name} will need to sign in again on every device.`,
-                    okText: "Revoke sessions",
-                    onOk: async () => {
-                      await apiRequest(
-                        `/admin/users/${record.id}/reset-sessions`,
-                        { method: "POST" },
-                      );
-                      message.success("All active sessions were revoked");
-                    },
-                  }),
-              },
-              { type: "divider" },
-              {
-                key: "suspend",
-                label: "Suspend account",
-                icon: <LockOutlined />,
-                danger: true,
-                disabled: record.status === "SUSPENDED",
-                onClick: () =>
-                  modal.confirm({
-                    title: "Suspend this account?",
-                    content: `${record.name} will lose access and all active sessions will be revoked.`,
-                    okText: "Suspend",
-                    okButtonProps: { danger: true },
-                    onOk: async () => {
-                      await updateUser(record, { status: "SUSPENDED" });
-                      message.success("Account suspended");
-                    },
-                  }),
-              },
-            ],
-          }}
-        >
-          <Button
-            type="text"
-            icon={<MoreOutlined />}
-            aria-label={`Actions for ${record.name}`}
-          />
-        </Dropdown>,
+        <span key="actions">{renderActions(record)}</span>,
       ],
     },
   ];
@@ -268,22 +308,159 @@ export function UsersPage() {
         </ProCard>
       </ProCard>
 
-      <ProTable<UserRecord>
-        className="admin-table"
-        rowKey="id"
-        columns={columns}
-        dataSource={users}
-        loading={isLoading}
-        scroll={{ x: "max-content" }}
-        options={{
-          density: false,
-          fullScreen: true,
-          reload: () => void refetch(),
-        }}
-        pagination={{ pageSize: 10, showSizeChanger: false }}
-        search={{ labelWidth: "auto", defaultCollapsed: false }}
-        toolbar={{ title: "Directory" }}
-      />
+      <div className="admin-record-surface">
+        <div className="admin-record-toolbar">
+          <Typography.Text strong>Directory</Typography.Text>
+          <Segmented
+            size="small"
+            aria-label="User view"
+            value={viewMode}
+            options={[
+              { value: "table", icon: <BarsOutlined />, label: "Table" },
+              { value: "card", icon: <AppstoreOutlined />, label: "Cards" },
+            ]}
+            onChange={(value) => {
+              setViewMode(value as "table" | "card");
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="admin-filter-bar" role="search" aria-label="Filter users">
+          <Input
+            allowClear
+            value={filters.query}
+            placeholder="Search name or email"
+            onChange={(event) => {
+              setFilters((current) => ({ ...current, query: event.target.value }));
+              setPage(1);
+            }}
+          />
+          <Select
+            allowClear
+            value={filters.department}
+            placeholder="Department"
+            options={departmentOptions}
+            onChange={(value) => {
+              setFilters((current) => ({ ...current, department: value }));
+              setPage(1);
+            }}
+          />
+          <Select
+            allowClear
+            value={filters.role}
+            placeholder="Role"
+            options={roleOptions}
+            onChange={(value) => {
+              setFilters((current) => ({ ...current, role: value }));
+              setPage(1);
+            }}
+          />
+          <Select
+            allowClear
+            value={filters.status}
+            placeholder="Status"
+            options={statusOptions}
+            onChange={(value) => {
+              setFilters((current) => ({ ...current, status: value }));
+              setPage(1);
+            }}
+          />
+          <Button
+            type="text"
+            disabled={
+              !filters.query &&
+              !filters.department &&
+              !filters.role &&
+              !filters.status
+            }
+            onClick={() => {
+              setFilters({ query: "" });
+              setPage(1);
+            }}
+          >
+            Clear
+          </Button>
+        </div>
+        {viewMode === "table" ? (
+          <ProTable<UserRecord>
+            className="admin-table"
+            rowKey="id"
+            columns={columns}
+            dataSource={filteredUsers}
+            loading={isLoading}
+            size="small"
+            scroll={{ x: "max-content" }}
+            options={{
+              density: false,
+              fullScreen: true,
+              reload: () => void refetch(),
+            }}
+            pagination={{ pageSize: 10, showSizeChanger: false }}
+            search={false}
+            toolbar={{ title: undefined }}
+          />
+        ) : (
+          <>
+            {isLoading ? (
+              <div className="admin-card-loading">Loading users…</div>
+            ) : visibleUsers.length ? (
+              <div className="admin-card-grid">
+                {visibleUsers.map((record) => (
+                  <Card key={record.id} size="small" className="admin-record-card">
+                    <div className="admin-card-heading">
+                      <Space size={10} align="start">
+                        <Avatar size={34}>{initials(record.name)}</Avatar>
+                        <span className="user-cell">
+                          <Typography.Text strong ellipsis>
+                            {record.name}
+                          </Typography.Text>
+                          <Typography.Text type="secondary" ellipsis>
+                            {record.email}
+                          </Typography.Text>
+                        </span>
+                      </Space>
+                      {renderActions(record)}
+                    </div>
+                    <div className="admin-card-fields">
+                      <span>
+                        <Typography.Text type="secondary">Department</Typography.Text>
+                        <Typography.Text>{record.department || "Not set"}</Typography.Text>
+                      </span>
+                      <span>
+                        <Typography.Text type="secondary">Role</Typography.Text>
+                        <Tag color={roleColors[record.role]}>{roleLabels[record.role]}</Tag>
+                      </span>
+                      <span>
+                        <Typography.Text type="secondary">Status</Typography.Text>
+                        <Tag color={statusColors[record.status]}>{statusLabels[record.status]}</Tag>
+                      </span>
+                      <span>
+                        <Typography.Text type="secondary">Last active</Typography.Text>
+                        <Typography.Text>
+                          {record.lastActiveAt
+                            ? new Date(record.lastActiveAt).toLocaleString()
+                            : "Never"}
+                        </Typography.Text>
+                      </span>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No users found" />
+            )}
+            <Pagination
+              className="admin-card-pagination"
+              current={page}
+              pageSize={10}
+              total={filteredUsers.length}
+              showSizeChanger={false}
+              hideOnSinglePage
+              onChange={setPage}
+            />
+          </>
+        )}
+      </div>
 
       <ModalForm
         open={modalOpen}

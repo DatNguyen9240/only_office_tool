@@ -1,7 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -15,12 +18,30 @@ import { CurrentUser } from "./decorators/current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
+import {
+  ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  UpdateProfileDto,
+} from "./dto/account.dto";
+import {
+  PasskeyAuthenticationOptionsDto,
+  PasskeyAuthenticationVerifyDto,
+  PasskeyRegistrationOptionsDto,
+  PasskeyRegistrationVerifyDto,
+} from "./dto/passkey.dto";
+import { PasskeyService } from "./passkey.service";
+import { Throttle } from "@nestjs/throttler";
 
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly passkeys: PasskeyService,
+  ) {}
 
   @Post("login")
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   login(
     @Body() input: LoginDto,
     @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
@@ -47,6 +68,109 @@ export class AuthController {
   @Get("me")
   me(@CurrentUser() user: AuthenticatedUser) {
     return this.auth.me(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch("profile")
+  updateProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: UpdateProfileDto,
+  ) {
+    return this.auth.updateProfile(user, input);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("change-password")
+  changePassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: ChangePasswordDto,
+  ) {
+    return this.auth.changePassword(user, input);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("sessions")
+  sessions(@CurrentUser() user: AuthenticatedUser) {
+    return this.auth.listSessions(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete("sessions/:id")
+  revokeSession(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") sessionId: string,
+  ) {
+    return this.auth.revokeSession(user, sessionId);
+  }
+
+  @Post("forgot-password")
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  forgotPassword(@Body() input: ForgotPasswordDto) {
+    return this.auth.forgotPassword(input);
+  }
+
+  @Post("reset-password")
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
+  resetPassword(@Body() input: ResetPasswordDto) {
+    return this.auth.resetPassword(input);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("passkeys/register/options")
+  passkeyRegistrationOptions(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: PasskeyRegistrationOptionsDto,
+  ) {
+    return this.passkeys.registrationOptions(user, input);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("passkeys/register/verify")
+  passkeyRegistrationVerify(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() input: PasskeyRegistrationVerifyDto,
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
+  ) {
+    return this.passkeys.verifyRegistration(
+      user,
+      input,
+      this.requestContext(request),
+    );
+  }
+
+  @Post("passkeys/login/options")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  passkeyAuthenticationOptions(
+    @Body() input: PasskeyAuthenticationOptionsDto,
+  ) {
+    return this.passkeys.authenticationOptions(input);
+  }
+
+  @Post("passkeys/login/verify")
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  passkeyAuthenticationVerify(
+    @Body() input: PasskeyAuthenticationVerifyDto,
+    @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
+  ) {
+    return this.passkeys.verifyAuthentication(
+      input,
+      this.requestContext(request),
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("passkeys")
+  passkeyList(@CurrentUser() user: AuthenticatedUser) {
+    return this.passkeys.list(user);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete("passkeys/:id")
+  passkeyDelete(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param("id") credentialId: string,
+  ) {
+    return this.passkeys.remove(user, credentialId);
   }
 
   private requestContext(request: {

@@ -3,7 +3,10 @@ import {
   HistoryOutlined,
   DownloadOutlined,
   DeleteOutlined,
+  EditOutlined,
+  FolderOpenOutlined,
   ShareAltOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { Button, Dropdown, Space, Typography } from "antd";
 import type { DocumentItem } from "@share";
@@ -18,6 +21,9 @@ interface FileCardProps {
   onVersions?: () => void;
   onDownload?: () => void;
   onDelete?: () => void;
+  onRename?: () => void;
+  onMove?: () => void;
+  onStar?: () => void;
 }
 
 export function FileCard({
@@ -29,6 +35,9 @@ export function FileCard({
   onVersions,
   onDownload,
   onDelete,
+  onRename,
+  onMove,
+  onStar,
 }: FileCardProps) {
   return (
     <article
@@ -46,6 +55,26 @@ export function FileCard({
           menu={{
             items: [
               { key: "open", label: "Open", onClick: onOpen },
+              {
+                key: "rename",
+                icon: <EditOutlined />,
+                label: "Rename",
+                onClick: onRename,
+              },
+              {
+                key: "move",
+                icon: <FolderOpenOutlined />,
+                label: "Move",
+                onClick: onMove,
+              },
+              {
+                key: "star",
+                icon: <StarOutlined />,
+                label: document.starred
+                  ? "Remove from favorites"
+                  : "Add to favorites",
+                onClick: onStar,
+              },
               {
                 key: "share",
                 icon: <ShareAltOutlined />,

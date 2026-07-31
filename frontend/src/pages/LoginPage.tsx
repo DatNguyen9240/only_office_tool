@@ -30,6 +30,8 @@ export function LoginPage() {
   const { locale, t } = useI18n();
   const { message } = App.useApp();
   const login = useAuthStore((state) => state.login);
+  const loginWithPasskey = useAuthStore((state) => state.loginWithPasskey);
+  const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>();
 
@@ -49,6 +51,29 @@ export function LoginPage() {
       navigate(from?.pathname || "/documents", { replace: true });
     } catch (cause) {
       const rawError = cause instanceof Error ? cause.message : "Sign in failed";
+      const nextError = translateApiError(rawError, locale);
+      setError(nextError);
+      message.error(nextError);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const signInWithPasskey = async () => {
+    try {
+      await form.validateFields(["email"]);
+      setSubmitting(true);
+      setError(undefined);
+      await loginWithPasskey(
+        form.getFieldValue("email") as string,
+        form.getFieldValue("remember") !== false,
+      );
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from;
+      navigate(from?.pathname || "/documents", { replace: true });
+    } catch (cause) {
+      if (cause && typeof cause === "object" && "errorFields" in cause) return;
+      const rawError =
+        cause instanceof Error ? cause.message : "Passkey sign in failed";
       const nextError = translateApiError(rawError, locale);
       setError(nextError);
       message.error(nextError);
@@ -117,6 +142,7 @@ export function LoginPage() {
             </Typography.Paragraph>
           </div>
           <Form
+            form={form}
             className="login-form"
             layout="vertical"
             requiredMark={false}
@@ -162,7 +188,7 @@ export function LoginPage() {
               <Form.Item name="remember" valuePropName="checked" noStyle>
                 <Checkbox>{t("login.remember")}</Checkbox>
               </Form.Item>
-              <Button type="link" disabled title="Not available yet">
+              <Button type="link" onClick={() => navigate("/forgot-password")}>
                 {t("login.forgot")}
               </Button>
             </div>
@@ -180,11 +206,11 @@ export function LoginPage() {
           <Button
             className="login-sso-button"
             icon={<SafetyCertificateOutlined />}
-            disabled
-            title="SSO is not configured"
+            onClick={signInWithPasskey}
+            loading={submitting}
             block
           >
-            {t("login.sso")}
+            {t("login.passkey")}
           </Button>
           <div className="login-assurance">
             <SafetyCertificateOutlined />

@@ -9,6 +9,7 @@ import {
 import { Button, Descriptions, Empty, Tag, Typography } from "antd";
 import type { DocumentItem } from "@share";
 import { fileIcon, fileTypeLabels } from "@/components/documents/filePresentation";
+import { CommentsPanel } from "@/components/documents/CommentsPanel";
 
 interface DocumentPreviewProps {
   document?: DocumentItem;
@@ -17,6 +18,7 @@ interface DocumentPreviewProps {
   onVersions?: () => void;
   onDownload?: () => void;
   onClose?: () => void;
+  onMetadata?: () => void;
 }
 
 export function DocumentPreview({
@@ -26,6 +28,7 @@ export function DocumentPreview({
   onVersions,
   onDownload,
   onClose,
+  onMetadata,
 }: DocumentPreviewProps) {
   if (!document) {
     return (
@@ -88,6 +91,18 @@ export function DocumentPreview({
       <Button block icon={<HistoryOutlined />} onClick={onVersions}>
         View version history
       </Button>
+      <Button
+        block
+        icon={<FileSearchOutlined />}
+        onClick={onMetadata}
+        style={{ marginTop: 8 }}
+      >
+        Metadata and tags
+      </Button>
+      <CommentsPanel
+        documentId={document.id}
+        canComment={document.permission !== "Viewer"}
+      />
     </aside>
   );
 }

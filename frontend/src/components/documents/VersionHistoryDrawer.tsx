@@ -6,6 +6,8 @@ import {
   Button,
   Drawer,
   Popconfirm,
+  Modal,
+  Select,
   Space,
   Tag,
   Timeline,
@@ -41,6 +43,13 @@ export function VersionHistoryDrawer({
   const [versionList, setVersionList] = useState<VersionItem[]>([]);
   const [restoring, setRestoring] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [compareSelection, setCompareSelection] = useState<number[]>([]);
+  const [comparison, setComparison] = useState<{
+    comparable: boolean;
+    message?: string;
+    changedLines?: number;
+    changes?: Array<{ line: number; before: string | null; after: string | null }>;
+  }>();
 
   useEffect(() => {
     if (!open || !document?.id) {
@@ -109,6 +118,36 @@ export function VersionHistoryDrawer({
           </Typography.Text>
         </div>
       )}
+      {versionList.length > 1 && (
+        <Space.Compact style={{ width: "100%", marginBottom: 20 }}>
+          <Select
+            mode="multiple"
+            maxCount={2}
+            value={compareSelection}
+            onChange={setCompareSelection}
+            placeholder="Choose 2 versions to compare"
+            style={{ flex: 1 }}
+            options={versionList.map((version) => ({
+              value: version.version,
+              label: version.versionLabel,
+            }))}
+          />
+          <Button
+            disabled={compareSelection.length !== 2}
+            onClick={async () => {
+              if (!document || compareSelection.length !== 2) return;
+              const [from, to] = [...compareSelection].sort((a, b) => a - b);
+              setComparison(
+                await apiRequest(
+                  `/documents/${document.id}/versions/compare?from=${from}&to=${to}`,
+                ),
+              );
+            }}
+          >
+            Compare
+          </Button>
+        </Space.Compact>
+      )}
       <Timeline
         pending={loading}
         items={versionList.map((item, index) => {
@@ -155,6 +194,34 @@ export function VersionHistoryDrawer({
           };
         })}
       />
+      <Modal
+        open={Boolean(comparison)}
+        title="Version comparison"
+        footer={null}
+        onCancel={() => setComparison(undefined)}
+        width={760}
+      >
+        {!comparison?.comparable ? (
+          <Typography.Text type="secondary">
+            {comparison?.message}
+          </Typography.Text>
+        ) : (
+          <>
+            <Typography.Paragraph>
+              {comparison.changedLines} changed lines
+            </Typography.Paragraph>
+            <div className="version-diff">
+              {comparison.changes?.slice(0, 200).map((change) => (
+                <div key={change.line} className="version-diff-row">
+                  <code>{change.line}</code>
+                  <del>{change.before ?? "∅"}</del>
+                  <ins>{change.after ?? "∅"}</ins>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Modal>
     </Drawer>
   );
 }

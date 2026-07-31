@@ -9,6 +9,13 @@ import { EditorPage } from "@/pages/EditorPage";
 import { UsersPage } from "@/pages/admin/UsersPage";
 import { AuditPage } from "@/pages/admin/AuditPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
+import { ShareLinkPage } from "@/pages/ShareLinkPage";
+import { SearchPage } from "@/pages/SearchPage";
+import { SettingsPage } from "@/pages/SettingsPage";
+import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
+import { GroupsPage } from "@/pages/admin/GroupsPage";
+import { AssistantPage } from "@/pages/AssistantPage";
+import { TemplatesPage } from "@/pages/TemplatesPage";
 
 export const router = createBrowserRouter([
   {
@@ -19,6 +26,9 @@ export const router = createBrowserRouter([
       </PublicOnly>
     ),
   },
+  { path: "/share/:token", element: <ShareLinkPage /> },
+  { path: "/forgot-password", element: <ForgotPasswordPage /> },
+  { path: "/reset-password", element: <ForgotPasswordPage /> },
   {
     path: "/editor/:id",
     element: (
@@ -45,14 +55,28 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "search", element: <SearchPage /> },
+      { path: "assistant", element: <AssistantPage /> },
+      { path: "templates", element: <TemplatesPage /> },
+      { path: "settings", element: <SettingsPage /> },
       { path: "documents", element: <DocumentsPage /> },
       { path: "shared", element: <DocumentsPage scope="shared" /> },
+      { path: "recent", element: <DocumentsPage scope="recent" /> },
+      { path: "favorites", element: <DocumentsPage scope="favorites" /> },
       { path: "trash", element: <TrashPage /> },
       {
         path: "admin/users",
         element: (
           <RequireRole roles={["ADMINISTRATOR"]}>
             <UsersPage />
+          </RequireRole>
+        ),
+      },
+      {
+        path: "admin/groups",
+        element: (
+          <RequireRole roles={["ADMINISTRATOR"]}>
+            <GroupsPage />
           </RequireRole>
         ),
       },

@@ -28,7 +28,11 @@ export class DocumentAccessService {
 
   permissionWhere(user: AuthenticatedUser): Prisma.DocumentPermissionWhereInput {
     return {
-      OR: [{ userId: user.id }, { email: user.email }],
+      OR: [
+        { userId: user.id },
+        { email: user.email },
+        { group: { members: { some: { userId: user.id } } } },
+      ],
     };
   }
 
@@ -38,6 +42,19 @@ export class DocumentAccessService {
       OR: [
         { ownerId: user.id },
         { permissions: { some: this.permissionWhere(user) } },
+        {
+          folder: {
+            permissions: {
+              some: {
+                OR: [
+                  { userId: user.id },
+                  { email: user.email },
+                  { group: { members: { some: { userId: user.id } } } },
+                ],
+              },
+            },
+          },
+        },
       ],
     };
   }

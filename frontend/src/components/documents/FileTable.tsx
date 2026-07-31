@@ -35,6 +35,8 @@ interface FileTableProps {
   onRename?: (document: DocumentItem) => void;
   onMove?: (document: DocumentItem) => void;
   onStar?: (document: DocumentItem) => void;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }
 
 const statusMap = {
@@ -61,6 +63,8 @@ export function FileTable({
   onRename,
   onMove,
   onStar,
+  selectedIds = [],
+  onSelectionChange,
 }: FileTableProps) {
   if (loading) {
     return <FileTableSkeleton narrow={narrow} />;
@@ -246,6 +250,9 @@ export function FileTable({
           ? undefined
           : {
               columnWidth: 44,
+              selectedRowKeys: selectedIds,
+              onChange: (keys) =>
+                onSelectionChange?.(keys.map((key) => String(key))),
             }
       }
       scroll={{ x: narrow ? 360 : 860 }}

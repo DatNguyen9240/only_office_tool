@@ -1,10 +1,14 @@
 import {
   AuditOutlined,
+  ClockCircleOutlined,
   DashboardOutlined,
   DeleteOutlined,
   FileTextOutlined,
+  StarOutlined,
   ShareAltOutlined,
   TeamOutlined,
+  BulbOutlined,
+  FileAddOutlined,
 } from "@ant-design/icons";
 import { ProLayout, type ProLayoutProps } from "@ant-design/pro-components";
 import { useMemo } from "react";
@@ -18,8 +22,12 @@ const baseRoute = {
   path: "/",
   children: [
     { path: "/dashboard", name: "Dashboard", icon: <DashboardOutlined /> },
+    { path: "/assistant", name: "AI assistant", icon: <BulbOutlined /> },
+    { path: "/templates", name: "Templates", icon: <FileAddOutlined /> },
     { path: "/documents", name: "Documents", icon: <FileTextOutlined /> },
     { path: "/shared", name: "Shared with me", icon: <ShareAltOutlined /> },
+    { path: "/recent", name: "Recent", icon: <ClockCircleOutlined /> },
+    { path: "/favorites", name: "Favorites", icon: <StarOutlined /> },
     { path: "/trash", name: "Trash", icon: <DeleteOutlined /> },
     {
       path: "/admin",
@@ -27,6 +35,7 @@ const baseRoute = {
       icon: <TeamOutlined />,
       children: [
         { path: "/admin/users", name: "Users", icon: <TeamOutlined /> },
+        { path: "/admin/groups", name: "Groups", icon: <TeamOutlined /> },
         { path: "/admin/audit", name: "Audit logs", icon: <AuditOutlined /> },
       ],
     },

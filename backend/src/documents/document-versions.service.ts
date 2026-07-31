@@ -1,8 +1,10 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
 } from "@nestjs/common";
+import { ScanStatus } from "@prisma/client";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
@@ -77,6 +79,9 @@ export class DocumentVersionsService {
           checksum: targetVersion.checksum,
           note: `Restored from version ${targetVersion.version}`,
           authorId: user.id,
+          scanStatus: targetVersion.scanStatus,
+          scanMessage: targetVersion.scanMessage,
+          scannedAt: targetVersion.scannedAt,
         },
       });
       await tx.document.update({
@@ -113,9 +118,12 @@ export class DocumentVersionsService {
     if (!document) throw new NotFoundException("Document not found");
     const version = await this.prisma.documentVersion.findFirst({
       where: { documentId: id, version: versionNumber },
-      select: { objectKey: true },
+      select: { objectKey: true, scanStatus: true },
     });
     if (!version) throw new NotFoundException("Version not found");
+    if (version.scanStatus !== ScanStatus.CLEAN) {
+      throw new ConflictException("Document security scan is not complete");
+    }
     const download = {
       documentId: id,
       name: document.name,
@@ -129,6 +137,58 @@ export class DocumentVersionsService {
       document.name,
     );
     return download;
+  }
+
+  async compareVersions(
+    id: string,
+    from: number,
+    to: number,
+    user: AuthenticatedUser,
+  ) {
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null, ...this.accessService.accessWhere(user) },
+      select: { id: true },
+    });
+    if (!document) throw new NotFoundException("Document not found");
+    const versions = await this.prisma.documentVersion.findMany({
+      where: { documentId: id, version: { in: [from, to] } },
+      select: {
+        version: true,
+        textContent: true,
+        createdAt: true,
+        author: { select: { name: true } },
+      },
+    });
+    const source = versions.find((version) => version.version === from);
+    const target = versions.find((version) => version.version === to);
+    if (!source || !target) throw new NotFoundException("Version not found");
+    if (source.textContent === null || target.textContent === null) {
+      return {
+        from,
+        to,
+        comparable: false,
+        message: "Text extraction is not available for these versions",
+      };
+    }
+    const before = source.textContent.split(/\r?\n/);
+    const after = target.textContent.split(/\r?\n/);
+    const max = Math.max(before.length, after.length);
+    const changes = [];
+    for (let index = 0; index < max; index += 1) {
+      if (before[index] === after[index]) continue;
+      changes.push({
+        line: index + 1,
+        before: before[index] ?? null,
+        after: after[index] ?? null,
+      });
+    }
+    return {
+      from,
+      to,
+      comparable: true,
+      changedLines: changes.length,
+      changes,
+    };
   }
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {

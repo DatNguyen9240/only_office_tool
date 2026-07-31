@@ -5,7 +5,7 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
-import { DocumentType } from "@prisma/client";
+import { DocumentStatus, DocumentType, ScanStatus } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import type { AuthenticatedUser } from "../auth/auth.types";
 import { AuditService } from "../audit/audit.service";
@@ -13,6 +13,8 @@ import { PrismaService } from "../prisma/prisma.service";
 import { StorageService } from "../storage/storage.service";
 import { CompleteUploadDto } from "./dto/complete-upload.dto";
 import { CreateUploadUrlDto } from "./dto/create-upload-url.dto";
+import { validateFileMagicBytes } from "../common/utils/file-signature.util";
+import { OperationsService } from "../operations/operations.service";
 
 const documentTypes: Record<string, DocumentType> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -24,11 +26,19 @@ const documentTypes: Record<string, DocumentType> = {
   "application/pdf": DocumentType.PDF,
 };
 
+const documentExtensions: Partial<Record<DocumentType, string>> = {
+  [DocumentType.DOCX]: ".docx",
+  [DocumentType.XLSX]: ".xlsx",
+  [DocumentType.PPTX]: ".pptx",
+  [DocumentType.PDF]: ".pdf",
+};
+
 @Injectable()
 export class FilesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    @Optional() private readonly operations?: OperationsService,
     @Optional() private readonly audit?: AuditService,
   ) {}
 
@@ -42,6 +52,11 @@ export class FilesService {
     const extension = input.name.includes(".")
       ? input.name.slice(input.name.lastIndexOf(".")).toLowerCase()
       : "";
+    if (extension !== documentExtensions[type]) {
+      throw new BadRequestException(
+        "File extension does not match the declared content type",
+      );
+    }
     if (input.folderId) {
       const folder = await this.prisma.folder.findFirst({
         where: { id: input.folderId, ownerId: user.id },
@@ -67,6 +82,15 @@ export class FilesService {
         objectKey,
         input.contentType,
       );
+      await this.prisma.uploadIntent.create({
+        data: {
+          documentId: document.id,
+          objectKey,
+          expectedSizeBytes: BigInt(input.sizeBytes),
+          contentType: input.contentType,
+          expiresAt: new Date(Date.now() + upload.expiresIn * 1000),
+        },
+      });
     } catch (error) {
       await this.prisma.document.delete({ where: { id: document.id } });
       throw error;
@@ -107,6 +131,20 @@ export class FilesService {
     if (existingVersion) {
       throw new ConflictException("Upload has already been completed");
     }
+    const intent = await this.prisma.uploadIntent.findFirst({
+      where: {
+        documentId,
+        objectKey: input.objectKey,
+        completedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+    if (
+      !intent ||
+      Number(intent.expectedSizeBytes) !== input.expectedSizeBytes
+    ) {
+      throw new BadRequestException("Upload intent is invalid or expired");
+    }
 
     const head = await this.storage.headObject(input.objectKey);
     if (!head.ContentLength || head.ContentLength <= 0) {
@@ -114,6 +152,15 @@ export class FilesService {
     }
     if (head.ContentLength !== input.expectedSizeBytes) {
       throw new BadRequestException("Uploaded object size does not match metadata");
+    }
+    const prefix = await this.storage.getObjectBuffer(
+      input.objectKey,
+      "bytes=0-15",
+    );
+    const expectedType = documentTypes[intent.contentType];
+    if (!expectedType || !validateFileMagicBytes(prefix, expectedType)) {
+      await this.storage.deleteObjects([input.objectKey]);
+      throw new BadRequestException("Uploaded file signature is invalid");
     }
 
     const version = await this.prisma.$transaction(async (tx) => {
@@ -131,15 +178,24 @@ export class FilesService {
           sizeBytes: BigInt(head.ContentLength ?? 0),
           checksum: head.ETag?.replaceAll('"', "") ?? null,
           authorId: user.id,
+          scanStatus: ScanStatus.PENDING,
         },
         select: { id: true, version: true, sizeBytes: true, createdAt: true },
       });
       await tx.document.update({
         where: { id: documentId },
-        data: { currentVersionId: created.id },
+        data: {
+          currentVersionId: created.id,
+          status: DocumentStatus.REVIEW,
+        },
+      });
+      await tx.uploadIntent.update({
+        where: { id: intent.id },
+        data: { completedAt: new Date() },
       });
       return created;
     });
+    await this.operations?.enqueueMalwareScan(version.id);
 
     await this.audit?.record({
       actorId: user.id,
@@ -172,7 +228,32 @@ export class FilesService {
                 {
                   permissions: {
                     some: {
-                      OR: [{ userId: user.id }, { email: user.email }],
+                      OR: [
+                        { userId: user.id },
+                        { email: user.email },
+                        {
+                          group: {
+                            members: { some: { userId: user.id } },
+                          },
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  folder: {
+                    permissions: {
+                      some: {
+                        OR: [
+                          { userId: user.id },
+                          { email: user.email },
+                          {
+                            group: {
+                              members: { some: { userId: user.id } },
+                            },
+                          },
+                        ],
+                      },
                     },
                   },
                 },
@@ -194,9 +275,16 @@ export class FilesService {
           : {}),
       },
       orderBy: { version: "desc" },
-      select: { objectKey: true },
+      select: { objectKey: true, scanStatus: true },
     });
     if (!version) throw new NotFoundException("Document has no uploaded version");
+    if (version.scanStatus !== ScanStatus.CLEAN) {
+      throw new ConflictException(
+        version.scanStatus === ScanStatus.INFECTED
+          ? "Document is quarantined"
+          : "Document security scan is not complete",
+      );
+    }
 
     const download = {
       documentId: document.id,

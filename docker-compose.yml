@@ -34,6 +34,41 @@ services:
         mc mb --ignore-existing "local/$${S3_BUCKET}"
     restart: "no"
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+  clamav:
+    image: clamav/clamav:stable
+    ports:
+      - "127.0.0.1:3310:3310"
+    volumes:
+      - clamav-data:/var/lib/clamav
+    restart: unless-stopped
+
+  tika:
+    image: apache/tika:latest-full
+    ports:
+      - "127.0.0.1:9998:9998"
+    restart: unless-stopped
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
   api:
     build:
       context: .
@@ -48,12 +83,31 @@ services:
       S3_ENDPOINT: http://minio:9000
       MINIO_METRICS_URL: http://minio:9000
       MINIO_METRICS_TOKEN: ""
+      REDIS_URL: redis://redis:6379
+      CLAMAV_HOST: clamav
+      CLAMAV_PORT: 3310
+      MALWARE_SCAN_REQUIRED: "true"
+      TIKA_URL: http://tika:9998
+      ELASTICSEARCH_URL: http://elasticsearch:9200
     depends_on:
       minio-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_started
+      clamav:
+        condition: service_started
+      tika:
+        condition: service_started
+      elasticsearch:
+        condition: service_started
     ports:
       - "5000:3000"
     init: true
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+volumes:
+  redis-data:
+  clamav-data:
+  elasticsearch-data:

@@ -6,6 +6,7 @@ import {
   loadStoredAuth,
   saveStoredAuth,
 } from "@/lib/authStorage";
+import { startAuthentication } from "@simplewebauthn/browser";
 
 type AuthStatus = "loading" | "authenticated" | "unauthenticated";
 
@@ -14,6 +15,7 @@ interface AuthState {
   user?: AuthUser;
   bootstrap: () => Promise<void>;
   login: (email: string, password: string, remember: boolean) => Promise<AuthUser>;
+  loginWithPasskey: (email: string, remember: boolean) => Promise<AuthUser>;
   logout: () => Promise<void>;
   markUnauthenticated: () => void;
 }
@@ -42,6 +44,36 @@ export const useAuthStore = create<AuthState>((set) => ({
       {
         method: "POST",
         body: JSON.stringify({ email, password }),
+      },
+      { skipAuth: true, retryOnUnauthorized: false },
+    );
+    saveStoredAuth(response, remember);
+    set({ status: "authenticated", user: response.user });
+    return response.user;
+  },
+  loginWithPasskey: async (email, remember) => {
+    const ceremony = await apiRequest<{
+      challengeId: string;
+      options: Parameters<typeof startAuthentication>[0]["optionsJSON"];
+    }>(
+      "/auth/passkeys/login/options",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+      { skipAuth: true, retryOnUnauthorized: false },
+    );
+    const credential = await startAuthentication({
+      optionsJSON: ceremony.options,
+    });
+    const response = await apiRequest<AuthTokensResponse>(
+      "/auth/passkeys/login/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          challengeId: ceremony.challengeId,
+          response: credential,
+        }),
       },
       { skipAuth: true, retryOnUnauthorized: false },
     );

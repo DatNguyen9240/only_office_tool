@@ -19,7 +19,12 @@ import { DocumentVersionsService } from "./document-versions.service";
 import { UpdateDocumentDto } from "./dto/update-document.dto";
 import { DocumentMapper } from "./mappers/document.mapper";
 
-type DocumentScope = "all" | "shared" | "trash";
+type DocumentScope =
+  | "all"
+  | "shared"
+  | "trash"
+  | "recent"
+  | "favorites";
 
 @Injectable()
 export class DocumentsService {
@@ -54,6 +59,9 @@ export class DocumentsService {
             permissions: { some: this.accessService.permissionWhere(user) },
           }
         : this.accessService.accessWhere(user)),
+      ...(scope === "favorites"
+        ? { favorites: { some: { userId: user.id } } }
+        : {}),
     };
 
     const documents = await this.prisma.document.findMany({
@@ -315,39 +323,40 @@ export class DocumentsService {
     id: string,
     user: AuthenticatedUser,
   ): Promise<DocumentItem> {
-    const current = await this.ensureOwnedDocument(id, user);
-
-    try {
-      const document = await this.prisma.document.update({
-        where: {
-          id,
-          version: current.version,
-        },
-        data: {
-          starred: !current.starred,
-          version: { increment: 1 },
-        },
-        include: DocumentMapper.publicInclude(this.accessService, user),
-      });
-
-      this.accessService.recordAuditAsync(
-        user.id,
-        document.starred ? AuditAction.DOCUMENT_STARRED : AuditAction.DOCUMENT_UNSTARRED,
+    const current = await this.prisma.document.findFirst({
+      where: {
         id,
-        current.name,
-      );
-      return DocumentMapper.toPublicItem(document, user.id);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2025"
-      ) {
-        throw new ConflictException(
-          "Document star status update conflict. The document was modified by another request.",
-        );
-      }
-      throw error;
+        deletedAt: null,
+        ...this.accessService.accessWhere(user),
+      },
+      select: { id: true, name: true },
+    });
+    if (!current) throw new NotFoundException("Document not found");
+
+    const existing = await this.prisma.documentFavorite.findUnique({
+      where: { documentId_userId: { documentId: id, userId: user.id } },
+      select: { id: true },
+    });
+    const starred = !existing;
+    if (existing) {
+      await this.prisma.documentFavorite.delete({ where: { id: existing.id } });
+    } else {
+      await this.prisma.documentFavorite.create({
+        data: { documentId: id, userId: user.id },
+      });
     }
+
+    const document = await this.prisma.document.findFirstOrThrow({
+      where: { id },
+      include: DocumentMapper.publicInclude(this.accessService, user),
+    });
+    this.accessService.recordAuditAsync(
+      user.id,
+      starred ? AuditAction.DOCUMENT_STARRED : AuditAction.DOCUMENT_UNSTARRED,
+      id,
+      current.name,
+    );
+    return DocumentMapper.toPublicItem(document, user.id);
   }
 
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {

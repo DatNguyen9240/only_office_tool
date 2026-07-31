@@ -14,6 +14,10 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CreateFolderDto } from "./dto/create-folder.dto";
 import { UpdateFolderDto } from "./dto/update-folder.dto";
+import {
+  CreateFolderPermissionDto,
+  UpdateFolderPermissionDto,
+} from "./dto/folder-permission.dto";
 import { FoldersService } from "./folders.service";
 
 @UseGuards(JwtAuthGuard)
@@ -26,7 +30,7 @@ export class FoldersController {
     @CurrentUser() user: AuthenticatedUser,
     @Query("parentId") parentId?: string,
   ) {
-    return this.folders.list(user.id, parentId);
+    return this.folders.list(user, parentId);
   }
 
   @Post()
@@ -49,5 +53,41 @@ export class FoldersController {
   @Delete(":id")
   remove(@Param("id") id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.folders.remove(id, user.id);
+  }
+
+  @Get(":id/permissions")
+  permissions(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.folders.listPermissions(id, user);
+  }
+
+  @Post(":id/permissions")
+  addPermission(
+    @Param("id") id: string,
+    @Body() input: CreateFolderPermissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.folders.addPermission(id, input, user);
+  }
+
+  @Patch(":id/permissions/:permissionId")
+  updatePermission(
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string,
+    @Body() input: UpdateFolderPermissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.folders.updatePermission(id, permissionId, input, user);
+  }
+
+  @Delete(":id/permissions/:permissionId")
+  removePermission(
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.folders.removePermission(id, permissionId, user);
   }
 }

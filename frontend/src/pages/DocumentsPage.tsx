@@ -2,9 +2,13 @@ import {
   AppstoreOutlined,
   BarsOutlined,
   DownOutlined,
+  DeleteOutlined,
+  DownloadOutlined,
   FilterOutlined,
   FolderAddOutlined,
+  FolderOpenOutlined,
   FolderOutlined,
+  ShareAltOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { PageContainer } from "@ant-design/pro-components";
@@ -18,12 +22,15 @@ import {
   Modal,
   Segmented,
   Select,
+  Space,
   Typography,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { DocumentPreview } from "@/components/documents/DocumentPreview";
+import { FolderPermissionModal } from "@/components/documents/FolderPermissionModal";
+import { DocumentMetadataModal } from "@/components/documents/DocumentMetadataModal";
 import { FileCardGridSkeleton } from "@/components/common/LoadingSkeletons";
 import { FileCard } from "@/components/documents/FileCard";
 import { FileTable } from "@/components/documents/FileTable";
@@ -33,36 +40,48 @@ import { SharePermissionModal } from "@/components/documents/SharePermissionModa
 import { UploadModal } from "@/components/documents/UploadModal";
 import { VersionHistoryDrawer } from "@/components/documents/VersionHistoryDrawer";
 import { useDocuments } from "@/hooks/useDocuments";
-import { useFolders } from "@/hooks/useFolders";
+import { useFolders, type FolderItem } from "@/hooks/useFolders";
 import { translateApiError, useI18n } from "@/i18n";
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
 import type { DocumentItem } from "@share";
 
 interface DocumentsPageProps {
-  scope?: "all" | "shared";
+  scope?: "all" | "shared" | "recent" | "favorites";
 }
 
 export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { locale } = useI18n();
   const queryClient = useQueryClient();
   const screens = Grid.useBreakpoint();
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadDirectory, setUploadDirectory] = useState(false);
   const [createFolderOpen, setCreateFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [creatingFolder, setCreatingFolder] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<FolderItem>();
+  const [movingFolder, setMovingFolder] = useState<FolderItem>();
+  const [moveParentId, setMoveParentId] = useState("root");
   const [shareDocument, setShareDocument] = useState<DocumentItem>();
   const [versionDocument, setVersionDocument] = useState<DocumentItem>();
+  const [metadataDocument, setMetadataDocument] = useState<DocumentItem>();
   const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
+  const [shareFolder, setShareFolder] = useState<FolderItem>();
   const [typeFilter, setTypeFilter] = useState("all");
   const [renameDocument, setRenameDocument] = useState<DocumentItem>();
   const [renameValue, setRenameValue] = useState("");
   const [moveDocument, setMoveDocument] = useState<DocumentItem>();
   const [moveFolderId, setMoveFolderId] = useState("all");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [batchMoveOpen, setBatchMoveOpen] = useState(false);
+  const [batchShareOpen, setBatchShareOpen] = useState(false);
+  const [batchTargetFolder, setBatchTargetFolder] = useState("all");
+  const [batchShareEmail, setBatchShareEmail] = useState("");
+  const [batchShareRole, setBatchShareRole] = useState("VIEWER");
   const { data = [], isLoading } = useDocuments(scope);
   const { data: folders = [] } = useFolders();
 
@@ -70,7 +89,14 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
     if (!newFolderName.trim()) return;
     setCreatingFolder(true);
     try {
-      if (isApiConfigured) {
+      if (editingFolder) {
+        await apiRequest(`/folders/${editingFolder.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name: newFolderName.trim() }),
+        });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        message.success("Folder renamed");
+      } else if (isApiConfigured) {
         await apiRequest("/folders", {
           method: "POST",
           body: JSON.stringify({
@@ -78,11 +104,12 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             parentId: selectedFolderId !== "all" ? selectedFolderId : undefined,
           }),
         });
-        queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        message.success(`Đã tạo thư mục "${newFolderName}"`);
       }
-      message.success(`Đã tạo thư mục "${newFolderName}"`);
       setNewFolderName("");
       setCreateFolderOpen(false);
+      setEditingFolder(undefined);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Tạo thư mục thất bại";
       message.error(translateApiError(msg, locale));
@@ -101,11 +128,59 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
     setPreviewOpen,
   } = useAppStore();
 
+  useEffect(() => {
+    setQuery(searchParams.get("q") ?? "");
+    if (scope === "all") {
+      setSelectedFolderId(searchParams.get("folderId") ?? "all");
+    }
+    const documentId = searchParams.get("documentId");
+    if (documentId) {
+      selectDocument(documentId);
+      setPreviewOpen(true);
+    }
+  }, [
+    scope,
+    searchParams,
+    selectDocument,
+    setPreviewOpen,
+    setSelectedFolderId,
+  ]);
+
+  const deleteFolder = async (folder: FolderItem) => {
+    try {
+      await apiRequest(`/folders/${folder.id}`, { method: "DELETE" });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      if (selectedFolderId === folder.id) setSelectedFolderId("all");
+      message.success("Folder deleted");
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Folder deletion failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
+  const moveFolder = async () => {
+    if (!movingFolder) return;
+    try {
+      await apiRequest(`/folders/${movingFolder.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          parentId: moveParentId === "root" ? null : moveParentId,
+        }),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      message.success("Folder moved");
+      setMovingFolder(undefined);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Folder move failed";
+      message.error(translateApiError(text, locale));
+    }
+  };
+
   const filtered = useMemo(
     () =>
       data.filter((document) => {
         const folderMatch =
-          scope === "shared" || selectedFolderId === "all"
+          scope !== "all" || selectedFolderId === "all"
             ? true
             : document.folderId === selectedFolderId;
         const queryMatch = document.name.toLowerCase().includes(query.toLowerCase());
@@ -118,11 +193,30 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const selectedDocument = data.find((item) => item.id === selectedDocumentId);
   const isDesktopPreview = Boolean(screens.xl);
   const showPreview = previewOpen && isDesktopPreview;
-  const title = scope === "shared" ? "Shared with me" : "Documents";
+  const title =
+    scope === "shared"
+      ? "Shared with me"
+      : scope === "recent"
+        ? "Recent"
+        : scope === "favorites"
+          ? "Favorites"
+          : "Documents";
+  const collectionHeading =
+    scope === "shared"
+      ? "All shared documents"
+      : scope === "recent"
+        ? "Recent documents"
+        : scope === "favorites"
+          ? "Starred documents"
+          : folders.find((folder) => folder.id === selectedFolderId)?.name;
   const subtitle =
     scope === "shared"
       ? "Documents shared directly with you or your teams."
-      : "Organize, edit, and govern your company documents.";
+      : scope === "recent"
+        ? "Documents you have opened or changed most recently."
+        : scope === "favorites"
+          ? "Documents you have starred for quick access."
+          : "Organize, edit, and govern your company documents.";
 
   const openDocument = (document: DocumentItem) => navigate(`/editor/${document.id}`);
   const removeDocument = async (document: DocumentItem) => {
@@ -178,12 +272,90 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
     }
   };
 
+  const selectedDocuments = data.filter((document) =>
+    selectedIds.includes(document.id),
+  );
+
+  const batchDelete = async () => {
+    await Promise.all(
+      selectedDocuments.map((document) =>
+        apiRequest(`/documents/${document.id}`, { method: "DELETE" }),
+      ),
+    );
+    await queryClient.invalidateQueries({ queryKey: ["documents"] });
+    setSelectedIds([]);
+    message.success(`${selectedDocuments.length} documents moved to trash`);
+  };
+
+  const batchDownload = async () => {
+    const downloads = await Promise.all(
+      selectedDocuments.map((document) =>
+        apiRequest<{ url: string }>(`/documents/${document.id}/download-url`),
+      ),
+    );
+    downloads.forEach(({ url }) => window.open(url, "_blank", "noopener,noreferrer"));
+  };
+
+  const batchMove = async () => {
+    await Promise.all(
+      selectedDocuments.map((document) =>
+        apiRequest(`/documents/${document.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            folderId: batchTargetFolder === "all" ? null : batchTargetFolder,
+          }),
+        }),
+      ),
+    );
+    await queryClient.invalidateQueries({ queryKey: ["documents"] });
+    setBatchMoveOpen(false);
+    setSelectedIds([]);
+    message.success("Documents moved");
+  };
+
+  const batchShare = async () => {
+    if (!batchShareEmail.trim()) return;
+    await Promise.all(
+      selectedDocuments.map((document) =>
+        apiRequest(`/documents/${document.id}/permissions`, {
+          method: "POST",
+          body: JSON.stringify({
+            email: batchShareEmail.trim(),
+            role: batchShareRole,
+          }),
+        }),
+      ),
+    );
+    setBatchShareOpen(false);
+    setBatchShareEmail("");
+    setSelectedIds([]);
+    message.success("Access granted");
+  };
+
   const folderPanel = (
     <FolderTree
       selectedId={selectedFolderId}
       onSelect={(id) => {
         setSelectedFolderId(id);
         setFolderDrawerOpen(false);
+      }}
+      onRename={(folder) => {
+        setEditingFolder(folder);
+        setNewFolderName(folder.name);
+      }}
+      onMove={(folder) => {
+        setMovingFolder(folder);
+        setMoveParentId(folder.parentId ?? "root");
+      }}
+      onShare={setShareFolder}
+      onDelete={(folder) => {
+        modal.confirm({
+          title: `Delete ${folder.name}?`,
+          content: "The folder must be empty before it can be deleted.",
+          okText: "Delete folder",
+          okButtonProps: { danger: true },
+          onOk: () => deleteFolder(folder),
+        });
       }}
     />
   );
@@ -205,8 +377,24 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           key="upload"
           menu={{
             items: [
-              { key: "files", label: "Upload files", icon: <UploadOutlined />, onClick: () => setUploadOpen(true) },
-              { key: "folder", label: "Upload folder", icon: <FolderOutlined /> },
+              {
+                key: "files",
+                label: "Upload files",
+                icon: <UploadOutlined />,
+                onClick: () => {
+                  setUploadDirectory(false);
+                  setUploadOpen(true);
+                },
+              },
+              {
+                key: "folder",
+                label: "Upload folder",
+                icon: <FolderOutlined />,
+                onClick: () => {
+                  setUploadDirectory(true);
+                  setUploadOpen(true);
+                },
+              },
             ],
           }}
         >
@@ -217,7 +405,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       ]}
     >
       <div className="documents-toolbar">
-        {!screens.lg && (
+        {scope === "all" && !screens.lg && (
           <Button icon={<FolderOutlined />} onClick={() => setFolderDrawerOpen(true)}>
             Folders
           </Button>
@@ -254,9 +442,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           <div className="file-region-heading">
             <div>
               <Typography.Text strong>
-                {scope === "shared"
-                  ? "All shared documents"
-                  : folders.find((folder) => folder.id === selectedFolderId)?.name}
+                {collectionHeading}
               </Typography.Text>
               <Typography.Text type="secondary">{filtered.length} items</Typography.Text>
             </div>
@@ -264,6 +450,50 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
               <Button onClick={() => setPreviewOpen(true)}>Preview</Button>
             )}
           </div>
+          {selectedIds.length > 0 && (
+            <div className="document-selection-bar">
+              <Typography.Text strong>{selectedIds.length} selected</Typography.Text>
+              <Space wrap>
+                <Button
+                  size="small"
+                  icon={<FolderOpenOutlined />}
+                  onClick={() => setBatchMoveOpen(true)}
+                >
+                  Move
+                </Button>
+                <Button
+                  size="small"
+                  icon={<ShareAltOutlined />}
+                  onClick={() => setBatchShareOpen(true)}
+                >
+                  Share
+                </Button>
+                <Button
+                  size="small"
+                  icon={<DownloadOutlined />}
+                  onClick={() => void batchDownload()}
+                >
+                  Download
+                </Button>
+                <Button
+                  danger
+                  size="small"
+                  icon={<DeleteOutlined />}
+                  onClick={() =>
+                    modal.confirm({
+                      title: `Move ${selectedIds.length} documents to trash?`,
+                      onOk: batchDelete,
+                    })
+                  }
+                >
+                  Delete
+                </Button>
+                <Button type="text" size="small" onClick={() => setSelectedIds([])}>
+                  Clear
+                </Button>
+              </Space>
+            </div>
+          )}
           {viewMode === "list" ? (
             <FileTable
               documents={filtered}
@@ -289,6 +519,8 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
                 setMoveFolderId(document.folderId);
               }}
               onStar={(document) => void toggleStar(document)}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
             />
           ) : isLoading ? (
             <FileCardGridSkeleton />
@@ -305,6 +537,15 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
                   onVersions={() => setVersionDocument(document)}
                   onDownload={() => void downloadDocument(document)}
                   onDelete={() => void removeDocument(document)}
+                  onRename={() => {
+                    setRenameDocument(document);
+                    setRenameValue(document.name);
+                  }}
+                  onMove={() => {
+                    setMoveDocument(document);
+                    setMoveFolderId(document.folderId);
+                  }}
+                  onStar={() => void toggleStar(document)}
                 />
               ))}
             </div>
@@ -316,6 +557,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             onOpen={() => selectedDocument && openDocument(selectedDocument)}
             onShare={() => setShareDocument(selectedDocument)}
             onVersions={() => setVersionDocument(selectedDocument)}
+            onMetadata={() => setMetadataDocument(selectedDocument)}
             onDownload={() =>
               selectedDocument && void downloadDocument(selectedDocument)
             }
@@ -344,6 +586,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           onOpen={() => selectedDocument && openDocument(selectedDocument)}
           onShare={() => setShareDocument(selectedDocument)}
           onVersions={() => setVersionDocument(selectedDocument)}
+          onMetadata={() => setMetadataDocument(selectedDocument)}
           onDownload={() =>
             selectedDocument && void downloadDocument(selectedDocument)
           }
@@ -351,12 +594,16 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       </Drawer>
       <Modal
         destroyOnHidden
-        open={createFolderOpen}
-        title="Tạo thư mục mới"
-        onCancel={() => setCreateFolderOpen(false)}
+        open={createFolderOpen || Boolean(editingFolder)}
+        title={editingFolder ? "Rename folder" : "Tạo thư mục mới"}
+        onCancel={() => {
+          setCreateFolderOpen(false);
+          setEditingFolder(undefined);
+          setNewFolderName("");
+        }}
         onOk={handleCreateFolder}
         confirmLoading={creatingFolder}
-        okText="Tạo thư mục"
+        okText={editingFolder ? "Rename" : "Tạo thư mục"}
         cancelText="Hủy"
       >
         <Input
@@ -367,17 +614,100 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           autoFocus
         />
       </Modal>
-      <UploadModal open={uploadOpen} onClose={() => setUploadOpen(false)} />
+      <Modal
+        open={Boolean(movingFolder)}
+        title={`Move ${movingFolder?.name ?? "folder"}`}
+        okText="Move"
+        onCancel={() => setMovingFolder(undefined)}
+        onOk={() => void moveFolder()}
+      >
+        <Select
+          style={{ width: "100%" }}
+          value={moveParentId}
+          onChange={setMoveParentId}
+          options={[
+            { label: "Root", value: "root" },
+            ...folders
+              .filter((folder) => folder.id !== movingFolder?.id)
+              .map((folder) => ({ label: folder.name, value: folder.id })),
+          ]}
+        />
+      </Modal>
+      <UploadModal
+        open={uploadOpen}
+        directory={uploadDirectory}
+        onClose={() => {
+          setUploadOpen(false);
+          setUploadDirectory(false);
+        }}
+      />
       <SharePermissionModal
         open={Boolean(shareDocument)}
         document={shareDocument}
         onClose={() => setShareDocument(undefined)}
+      />
+      <FolderPermissionModal
+        folder={shareFolder}
+        onClose={() => setShareFolder(undefined)}
       />
       <VersionHistoryDrawer
         open={Boolean(versionDocument)}
         document={versionDocument}
         onClose={() => setVersionDocument(undefined)}
       />
+      <DocumentMetadataModal
+        document={metadataDocument}
+        onClose={() => setMetadataDocument(undefined)}
+        onSaved={() => {
+          void queryClient.invalidateQueries({ queryKey: ["documents"] });
+        }}
+      />
+      <Modal
+        open={batchMoveOpen}
+        title={`Move ${selectedIds.length} documents`}
+        okText="Move"
+        onCancel={() => setBatchMoveOpen(false)}
+        onOk={() => void batchMove()}
+      >
+        <Select
+          style={{ width: "100%" }}
+          value={batchTargetFolder}
+          onChange={setBatchTargetFolder}
+          options={[
+            { label: "All files", value: "all" },
+            ...folders.map((folder) => ({
+              label: folder.name,
+              value: folder.id,
+            })),
+          ]}
+        />
+      </Modal>
+      <Modal
+        open={batchShareOpen}
+        title={`Share ${selectedIds.length} documents`}
+        okText="Share"
+        onCancel={() => setBatchShareOpen(false)}
+        onOk={() => void batchShare()}
+      >
+        <Space direction="vertical" size={12} style={{ width: "100%" }}>
+          <Input
+            type="email"
+            value={batchShareEmail}
+            placeholder="name@company.com"
+            onChange={(event) => setBatchShareEmail(event.target.value)}
+          />
+          <Select
+            style={{ width: "100%" }}
+            value={batchShareRole}
+            onChange={setBatchShareRole}
+            options={[
+              { label: "Viewer", value: "VIEWER" },
+              { label: "Commenter", value: "COMMENTER" },
+              { label: "Editor", value: "EDITOR" },
+            ]}
+          />
+        </Space>
+      </Modal>
       <Modal
         open={Boolean(renameDocument)}
         title="Rename document"
