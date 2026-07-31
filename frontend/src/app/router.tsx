@@ -1,21 +1,21 @@
 import { Navigate, createBrowserRouter } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PublicOnly, RequireAuth, RequireRole } from "@/app/routeGuards";
-import { LoginPage } from "@/pages/LoginPage";
-import { DashboardPage } from "@/pages/DashboardPage";
-import { DocumentsPage } from "@/pages/DocumentsPage";
-import { TrashPage } from "@/pages/TrashPage";
-import { EditorPage } from "@/pages/EditorPage";
+import { LoginPage } from "@/pages/auth/LoginPage";
+import { DashboardPage } from "@/pages/dashboard/DashboardPage";
+import { DocumentsPage } from "@/pages/documents/DocumentsPage";
+import { TrashPage } from "@/pages/documents/TrashPage";
+import { EditorPage } from "@/pages/documents/EditorPage";
 import { UsersPage } from "@/pages/admin/UsersPage";
 import { AuditPage } from "@/pages/admin/AuditPage";
-import { NotFoundPage } from "@/pages/NotFoundPage";
-import { ShareLinkPage } from "@/pages/ShareLinkPage";
-import { SearchPage } from "@/pages/SearchPage";
-import { SettingsPage } from "@/pages/SettingsPage";
-import { ForgotPasswordPage } from "@/pages/ForgotPasswordPage";
+import { NotFoundPage } from "@/pages/errors/NotFoundPage";
+import { ShareLinkPage } from "@/pages/documents/ShareLinkPage";
+import { SearchPage } from "@/pages/documents/SearchPage";
+import { SettingsPage } from "@/pages/settings/SettingsPage";
+import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { GroupsPage } from "@/pages/admin/GroupsPage";
-import { AssistantPage } from "@/pages/AssistantPage";
-import { TemplatesPage } from "@/pages/TemplatesPage";
+import { AssistantPage } from "@/pages/assistant/AssistantPage";
+import { TemplatesPage } from "@/pages/documents/TemplatesPage";
 
 export const router = createBrowserRouter([
   {

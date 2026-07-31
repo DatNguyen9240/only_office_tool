@@ -1,24 +1,24 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { HealthModule } from "./health/health.module";
-import { PrismaModule } from "./prisma/prisma.module";
-import { DocumentsModule } from "./documents/documents.module";
-import { FoldersModule } from "./folders/folders.module";
-import { FilesModule } from "./files/files.module";
-import { StorageModule } from "./storage/storage.module";
-import { AuthModule } from "./auth/auth.module";
-import { AdminModule } from "./admin/admin.module";
-import { AuditModule } from "./audit/audit.module";
-import { DashboardModule } from "./dashboard/dashboard.module";
-import { SearchModule } from "./search/search.module";
-import { NotificationsModule } from "./notifications/notifications.module";
+import { PrismaModule } from "./database/prisma/prisma.module";
+import { DocumentsModule } from "./modules/documents/documents.module";
+import { FoldersModule } from "./modules/folders/folders.module";
+import { FilesModule } from "./modules/files/files.module";
+import { StorageModule } from "./integrations/storage/storage.module";
+import { AuthModule } from "./core/auth/auth.module";
+import { AdminModule } from "./core/admin/admin.module";
+import { AuditModule } from "./core/audit/audit.module";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { SearchModule } from "./modules/search/search.module";
+import { NotificationsModule } from "./core/notifications/notifications.module";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
-import { OperationsModule } from "./operations/operations.module";
-import { TagsModule } from "./tags/tags.module";
-import { TemplatesModule } from "./templates/templates.module";
-import { AiModule } from "./ai/ai.module";
-import { WebhooksModule } from "./webhooks/webhooks.module";
+import { OperationsModule } from "./integrations/operations/operations.module";
+import { TagsModule } from "./modules/tags/tags.module";
+import { TemplatesModule } from "./modules/templates/templates.module";
+import { AiModule } from "./integrations/ai/ai.module";
+import { WebhooksModule } from "./integrations/webhooks/webhooks.module";
 
 function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   const requiredKeys = [

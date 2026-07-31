@@ -5,8 +5,8 @@ import type {
   DependencyStatus,
   HealthResponse,
 } from "@share";
-import { PrismaService } from "../prisma/prisma.service";
-import { StorageService } from "../storage/storage.service";
+import { PrismaService } from "../database/prisma/prisma.service";
+import { StorageService } from "../integrations/storage/storage.service";
 
 @Injectable()
 export class HealthService {

@@ -1,0 +1,188 @@
+import { LoadingOutlined } from "@ant-design/icons";
+import { Alert, Spin } from "antd";
+import { useEffect, useRef, useState } from "react";
+import { apiRequest, isApiConfigured } from "@/lib/api";
+
+declare global {
+  interface Window {
+    DocsAPI?: {
+      DocEditor: new (
+        elementId: string,
+        config: Record<string, unknown>,
+      ) => { destroy?: () => void };
+    };
+  }
+}
+
+interface OnlyOfficeEditorProps {
+  documentId?: string;
+}
+
+interface EditorConfigResponse {
+  onlyofficeServerUrl: string;
+  config: Record<string, unknown>;
+  watermarkText?: string;
+}
+
+export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const editorInstanceRef = useRef<{ destroy?: () => void } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>();
+  const [watermarkText, setWatermarkText] = useState<string>();
+
+  useEffect(() => {
+    if (!documentId || !isApiConfigured) {
+      setError(
+        !documentId
+          ? "Document ID is missing"
+          : "VITE_API_URL is not configured",
+      );
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    setError(undefined);
+
+    const initialize = async () => {
+      try {
+        const response = await apiRequest<EditorConfigResponse>(
+          `/documents/${documentId}/editor-config`,
+        );
+        if (!active) return;
+        setWatermarkText(response.watermarkText);
+
+        const serverUrl = response.onlyofficeServerUrl.replace(/\/$/, "");
+        if (!window.DocsAPI) {
+          await loadScript(
+            `${serverUrl}/web-apps/apps/api/documents/api.js`,
+          );
+        }
+        if (!active) return;
+        if (!window.DocsAPI || !containerRef.current) {
+          throw new Error("ONLYOFFICE SDK did not initialize");
+        }
+
+        containerRef.current.innerHTML = "";
+        const editorElement = window.document.createElement("div");
+        editorElement.id = `onlyoffice-editor-${documentId}`;
+        editorElement.style.width = "100%";
+        editorElement.style.height = "100%";
+        containerRef.current.appendChild(editorElement);
+        editorInstanceRef.current = new window.DocsAPI.DocEditor(
+          editorElement.id,
+          response.config,
+        );
+      } catch (cause) {
+        if (active) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Could not load the ONLYOFFICE editor",
+          );
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void initialize();
+    return () => {
+      active = false;
+      editorInstanceRef.current?.destroy?.();
+      editorInstanceRef.current = null;
+    };
+  }, [documentId]);
+
+  return (
+    <div style={{ width: "100%", height: "100%", minHeight: 650, position: "relative" }}>
+      {error ? (
+        <Alert
+          showIcon
+          type="error"
+          message="ONLYOFFICE editor is unavailable"
+          description={error}
+          style={{ margin: 24 }}
+        />
+      ) : null}
+      {loading ? (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100%",
+          }}
+        >
+          <Spin
+            indicator={<LoadingOutlined style={{ fontSize: 36 }} spin />}
+            tip="Loading ONLYOFFICE editor..."
+          />
+        </div>
+      ) : null}
+      <div
+        ref={containerRef}
+        hidden={loading || Boolean(error)}
+        style={{ width: "100%", height: "100%", minHeight: 650 }}
+      />
+      {!loading && !error && watermarkText && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 9999,
+            backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="350" height="200">
+                <text x="50%" y="50%" fill="black" font-size="13" font-family="sans-serif" font-weight="bold" opacity="${
+                  watermarkText.includes("CONFIDENTIAL") ? 0.14 : 0.05
+                }" transform="rotate(-30 175 100)" text-anchor="middle">
+                  ${watermarkText}
+                </text>
+              </svg>`,
+            )}")`,
+            backgroundRepeat: "repeat",
+          }}
+          aria-hidden="true"
+        />
+      )}
+    </div>
+  );
+}
+
+function loadScript(source: string) {
+  const existing = window.document.querySelector<HTMLScriptElement>(
+    `script[src="${source}"]`,
+  );
+  if (existing) {
+    return new Promise<void>((resolve, reject) => {
+      if (window.DocsAPI) {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error(`Failed to load ONLYOFFICE SDK from ${source}`)),
+        { once: true },
+      );
+    });
+  }
+  return new Promise<void>((resolve, reject) => {
+    const script = window.document.createElement("script");
+    script.src = source;
+    script.async = true;
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener(
+      "error",
+      () => reject(new Error(`Failed to load ONLYOFFICE SDK from ${source}`)),
+      { once: true },
+    );
+    window.document.body.appendChild(script);
+  });
+}
