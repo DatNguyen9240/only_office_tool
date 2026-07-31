@@ -28,41 +28,51 @@ import {
 } from "antd";
 import { useState } from "react";
 import type { UserRecord, UserRole, UserStatus } from "@share";
+import { useI18n } from "@/i18n";
 import { apiRequest } from "@/lib/api";
 
-const roleLabels: Record<UserRole, string> = {
-  EMPLOYEE: "Employee",
-  MANAGER: "Manager",
-  ADMINISTRATOR: "Administrator",
-};
 const roleColors: Record<UserRole, string> = {
   EMPLOYEE: "default",
   MANAGER: "blue",
   ADMINISTRATOR: "purple",
-};
-const statusLabels: Record<UserStatus, string> = {
-  ACTIVE: "Active",
-  INVITED: "Invited",
-  SUSPENDED: "Suspended",
 };
 const statusColors: Record<UserStatus, string> = {
   ACTIVE: "green",
   INVITED: "gold",
   SUSPENDED: "red",
 };
-const roleOptions = Object.entries(roleLabels).map(([value, label]) => ({
-  value,
-  label,
-}));
-const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export function UsersPage() {
   const { message, modal } = App.useApp();
+  const { t } = useI18n();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord>();
+  const roleLabels: Record<UserRole, string> = {
+    EMPLOYEE: t("admin.employee"),
+    MANAGER: t("admin.manager"),
+    ADMINISTRATOR: t("admin.administrator"),
+  };
+  const statusLabels: Record<UserStatus, string> = {
+    ACTIVE: t("status.active"),
+    INVITED: t("status.invited"),
+    SUSPENDED: t("status.suspended"),
+  };
+  const roleOptions = Object.entries(roleLabels).map(([value, label]) => ({
+    value,
+    label,
+  }));
+  const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({
+    value,
+    label,
+  }));
+  const departmentOptions = [
+    { value: "Sales", label: t("department.sales") },
+    { value: "Human Resources", label: t("department.humanResources") },
+    { value: "Finance", label: t("department.finance") },
+    { value: "Engineering", label: t("department.engineering") },
+    { value: "Operations", label: t("department.operations") },
+    { value: "Marketing", label: t("department.marketing") },
+    { value: "Legal", label: t("department.legal") },
+  ];
   const {
     data: users = [],
     isLoading,
@@ -88,6 +98,7 @@ export function UsersPage() {
     {
       title: "User",
       dataIndex: "name",
+      ellipsis: true,
       render: (_, record) => (
         <Space size={12}>
           <Avatar>{initials(record.name)}</Avatar>
@@ -103,11 +114,13 @@ export function UsersPage() {
     {
       title: "Department",
       dataIndex: "department",
+      width: 150,
       renderText: (value) => value || "—",
     },
     {
       title: "Role",
       dataIndex: "role",
+      width: 110,
       valueType: "select",
       fieldProps: { options: roleOptions },
       render: (_, record) => (
@@ -117,6 +130,7 @@ export function UsersPage() {
     {
       title: "Status",
       dataIndex: "status",
+      width: 120,
       valueType: "select",
       fieldProps: { options: statusOptions },
       render: (_, record) => (
@@ -128,6 +142,7 @@ export function UsersPage() {
     {
       title: "Last active",
       dataIndex: "lastActiveAt",
+      width: 170,
       search: false,
       renderText: (value) =>
         value ? new Date(value).toLocaleString() : "Never",
@@ -259,6 +274,7 @@ export function UsersPage() {
         columns={columns}
         dataSource={users}
         loading={isLoading}
+        scroll={{ x: "max-content" }}
         options={{
           density: false,
           fullScreen: true,
@@ -271,7 +287,13 @@ export function UsersPage() {
 
       <ModalForm
         open={modalOpen}
-        title={editingUser ? "Edit user" : "Create user"}
+        title={editingUser ? t("admin.editUser") : t("admin.createUser")}
+        submitter={{
+          searchConfig: {
+            resetText: t("common.cancel"),
+            submitText: editingUser ? t("common.save") : t("common.create"),
+          },
+        }}
         modalProps={{
           destroyOnHidden: true,
           onCancel: () => setModalOpen(false),
@@ -293,20 +315,20 @@ export function UsersPage() {
                 password: values.password || undefined,
               };
               await updateUser(editingUser, payload);
-              message.success("User updated");
+              message.success(t("admin.userUpdated"));
             } else {
               await apiRequest<UserRecord>("/admin/users", {
                 method: "POST",
                 body: JSON.stringify(values),
               });
               await refetch();
-              message.success("User created and can sign in");
+              message.success(t("admin.userCreated"));
             }
             setModalOpen(false);
             return true;
           } catch (cause) {
             message.error(
-              cause instanceof Error ? cause.message : "Could not save user",
+              cause instanceof Error ? cause.message : t("admin.saveFailed"),
             );
             return false;
           }
@@ -314,55 +336,64 @@ export function UsersPage() {
       >
         <ProFormText
           name="name"
-          label="Full name"
-          placeholder="Enter full name"
-          rules={[{ required: true, message: "Enter the user's name" }]}
+          label={t("admin.fullName")}
+          placeholder={t("admin.fullNamePlaceholder")}
+          rules={[{ required: true, message: t("admin.fullNameRequired") }]}
         />
         <ProFormText
           name="email"
-          label="Work email"
+          label={t("admin.workEmail")}
           placeholder="name@company.com"
           disabled={Boolean(editingUser)}
           rules={[
-            { required: true, message: "Enter a work email" },
-            { type: "email", message: "Enter a valid email" },
+            { required: true, message: t("admin.workEmailRequired") },
+            { type: "email", message: t("admin.emailInvalid") },
           ]}
         />
-        <ProFormText
+        <ProFormSelect
           name="department"
-          label="Department"
-          placeholder="Enter department"
+          label={t("admin.department")}
+          placeholder={t("admin.departmentPlaceholder")}
+          options={departmentOptions}
+          fieldProps={{
+            showSearch: true,
+            allowClear: true,
+          }}
         />
         <ProFormSelect
           name="role"
-          label="Role"
+          label={t("admin.role")}
           options={roleOptions}
-          rules={[{ required: true, message: "Choose a role" }]}
+          rules={[{ required: true, message: t("admin.roleRequired") }]}
         />
         {editingUser && (
           <ProFormSelect
             name="status"
-            label="Status"
+            label={t("admin.status")}
             options={statusOptions}
-            rules={[{ required: true, message: "Choose a status" }]}
+            rules={[{ required: true, message: t("admin.statusRequired") }]}
           />
         )}
         <ProFormText.Password
           name="password"
-          label={editingUser ? "New password" : "Temporary password"}
+          label={
+            editingUser
+              ? t("admin.newPassword")
+              : t("admin.temporaryPassword")
+          }
           placeholder={
             editingUser
-              ? "Leave blank to keep the current password"
-              : "At least 12 characters"
+              ? t("admin.keepPassword")
+              : t("admin.passwordPlaceholder")
           }
           rules={
             editingUser
-              ? [{ min: 12, message: "Password must be at least 12 characters" }]
+              ? [{ min: 12, message: t("admin.passwordMin") }]
               : [
-                  { required: true, message: "Enter a temporary password" },
+                  { required: true, message: t("admin.passwordRequired") },
                   {
                     min: 12,
-                    message: "Password must be at least 12 characters",
+                    message: t("admin.passwordMin"),
                   },
                 ]
           }

@@ -48,7 +48,12 @@ export function AppLayout() {
   }, [user?.role]);
 
   const selectedKeys = useMemo(() => [location.pathname], [location.pathname]);
-  const handleMenuClick = ({ key }: { key: string }) => navigate(key);
+  const handleMenuClick = ({ key }: { key: string }) => {
+    navigate(key);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      setCollapsed(true);
+    }
+  };
 
   return (
     <ProLayout

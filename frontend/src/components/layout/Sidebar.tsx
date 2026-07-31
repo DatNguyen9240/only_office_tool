@@ -33,6 +33,9 @@ export function Sidebar({ collapsed }: SidebarProps) {
             showInfo={false}
             strokeWidth={8}
           />
+          <span className="sidebar-storage-collapsed-label">
+            {storage ? formatBytes(storage.usedBytes) : "—"}
+          </span>
         </div>
       </Tooltip>
     );

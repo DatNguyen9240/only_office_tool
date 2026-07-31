@@ -1,17 +1,28 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": "/src",
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, ".", "");
+  const configuredBackend = env.BACKEND_URL || "http://localhost:5000";
+  const devApiTarget = configuredBackend.replace(/\/api\/?$/, "");
+
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@": "/src",
+      },
     },
-  },
-  server: {
-    port: 5173,
-  },
-  build: {
+    server: {
+      port: 5173,
+      proxy: {
+        "/api": {
+          target: devApiTarget,
+          changeOrigin: true,
+        },
+      },
+    },
+    build: {
     // Named groups keep antd/icons/pro-components as single chunks so rolldown
     // never splits their internal factory-registration pairs across boundaries
     // (which caused "a is not a function" when maxSize was also set on them).
@@ -50,5 +61,6 @@ export default defineConfig({
         },
       },
     },
-  },
+    },
+  };
 });

@@ -5,7 +5,7 @@ import {
   updateStoredTokens,
 } from "@/lib/authStorage";
 
-const apiBase = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+const apiBase = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
 export const isApiConfigured = Boolean(apiBase);
 

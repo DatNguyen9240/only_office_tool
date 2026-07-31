@@ -52,6 +52,7 @@ export function Header() {
       <Space size={4}>
         <Tooltip title="Help center is not available yet">
           <Button
+            className="header-secondary-action"
             disabled
             type="text"
             icon={<QuestionCircleOutlined />}
@@ -60,6 +61,7 @@ export function Header() {
         </Tooltip>
         <Tooltip title="Notifications are not available yet">
           <Button
+            className="header-secondary-action"
             disabled
             type="text"
             icon={<BellOutlined />}

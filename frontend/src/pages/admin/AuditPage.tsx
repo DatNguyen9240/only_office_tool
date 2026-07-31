@@ -14,6 +14,7 @@ import {
   Button,
   Descriptions,
   Drawer,
+  Grid,
   Tag,
   Typography,
 } from "antd";
@@ -23,6 +24,7 @@ import { apiRequest } from "@/lib/api";
 
 export function AuditPage() {
   const { message } = App.useApp();
+  const screens = Grid.useBreakpoint();
   const [selected, setSelected] = useState<AuditRecord>();
   const {
     data: auditRecords = [],
@@ -46,11 +48,13 @@ export function AuditPage() {
       {
         title: "Actor",
         dataIndex: "actor",
+        width: 180,
         copyable: true,
       },
       {
         title: "Action",
         dataIndex: "action",
+        width: 150,
         valueType: "select",
         fieldProps: {
           options: [...new Set(auditRecords.map((record) => record.action))].map(
@@ -65,11 +69,13 @@ export function AuditPage() {
       {
         title: "Resource",
         dataIndex: "resource",
+        width: 200,
         ellipsis: true,
       },
       {
         title: "Outcome",
         dataIndex: "outcome",
+        width: 110,
         valueType: "select",
         fieldProps: {
           options: [
@@ -176,23 +182,25 @@ export function AuditPage() {
         </div>
       </div>
       <ProTable<AuditRecord>
+        className="audit-table"
         rowKey="id"
         columns={columns}
         dataSource={auditRecords}
         loading={isLoading}
+        scroll={{ x: "max-content" }}
         options={{
           density: false,
           fullScreen: true,
           reload: () => void refetch(),
         }}
-        search={{ labelWidth: "auto", defaultCollapsed: false }}
+        search={{ labelWidth: "auto", defaultCollapsed: !screens.lg }}
         pagination={{ pageSize: 10, showSizeChanger: false }}
         toolbar={{ title: "Events" }}
       />
       <Drawer
         open={Boolean(selected)}
         title="Audit event details"
-        width={460}
+        width={screens.sm ? 460 : "100%"}
         onClose={() => setSelected(undefined)}
       >
         {selected && (

@@ -150,6 +150,11 @@ a:focus-visible,
 
 .mobile-menu-trigger {
   display: none;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  color: #344054;
+  font-size: 18px;
 }
 
 .global-search {
@@ -235,6 +240,16 @@ a:focus-visible,
   padding: 12px 0 18px;
   border-top: 1px solid #e5eaf0;
   color: #5d687a;
+}
+
+.sidebar-storage-collapsed-label {
+  max-width: 52px;
+  overflow: hidden;
+  color: #667286;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ant-page-header-heading-title {
@@ -1493,7 +1508,20 @@ html[data-theme="dark"] .login-assurance > .anticon {
 
 .audit-assurance > div {
   display: flex;
+  min-width: 0;
   flex-direction: column;
+}
+
+.audit-table {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid #e5eaf0;
+  border-radius: 8px;
+}
+
+.admin-table .ant-table-container,
+.audit-table .ant-table-container {
+  overflow-x: auto;
 }
 
 /* Editor */
@@ -3035,6 +3063,86 @@ html[data-theme="dark"] .route-skeleton-editor-canvas {
 }
 
 @media (max-width: 520px) {
+  .app-content-header {
+    padding-inline: 12px;
+  }
+
+  .global-header {
+    justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .header-route-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    margin-right: auto;
+    text-overflow: ellipsis;
+  }
+
+  .header-secondary-action {
+    display: none !important;
+  }
+
+  .audit-assurance {
+    align-items: flex-start;
+    margin-inline: 12px;
+    padding: 12px;
+  }
+
+  .audit-assurance .ant-typography {
+    white-space: normal;
+  }
+
+  .ant-pro-page-container,
+  .ant-pro-page-container-children-container {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ant-pro-page-container-children-container {
+    padding-inline: 0 !important;
+  }
+
+  .ant-pro-table {
+    max-width: 100%;
+  }
+
+  .ant-pro-table .ant-pro-card-body {
+    padding-inline: 0 !important;
+  }
+
+  .ant-pro-table-list-toolbar-container {
+    padding-inline: 12px !important;
+  }
+
+  .ant-pro-table .ant-table-pagination {
+    margin-inline: 12px !important;
+  }
+
+  .ant-pro-table .ant-table-container {
+    max-width: 100%;
+    overflow-x: auto !important;
+  }
+
+  .route-skeleton-content,
+  .route-skeleton-workspace-content {
+    padding-inline: 0;
+  }
+
+  .route-skeleton-content-heading,
+  .route-skeleton-heading,
+  .route-skeleton-metrics,
+  .route-skeleton-quick-grid {
+    margin-inline: 12px;
+  }
+
+  .file-table-skeleton {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
   .global-search {
     display: none;
   }

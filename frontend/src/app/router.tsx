@@ -1,67 +1,38 @@
-import { lazy, Suspense, type ReactNode } from "react";
 import { Navigate, createBrowserRouter } from "react-router-dom";
-import {
-  RouteSkeleton,
-  type RouteSkeletonVariant,
-} from "@/components/common/LoadingSkeletons";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PublicOnly, RequireAuth, RequireRole } from "@/app/routeGuards";
-
-const LoginPage = lazy(() =>
-  import("@/pages/LoginPage").then((module) => ({ default: module.LoginPage })),
-);
-const DashboardPage = lazy(() =>
-  import("@/pages/DashboardPage").then((module) => ({ default: module.DashboardPage })),
-);
-const DocumentsPage = lazy(() =>
-  import("@/pages/DocumentsPage").then((module) => ({ default: module.DocumentsPage })),
-);
-const TrashPage = lazy(() =>
-  import("@/pages/TrashPage").then((module) => ({ default: module.TrashPage })),
-);
-const EditorPage = lazy(() =>
-  import("@/pages/EditorPage").then((module) => ({ default: module.EditorPage })),
-);
-const UsersPage = lazy(() =>
-  import("@/pages/admin/UsersPage").then((module) => ({ default: module.UsersPage })),
-);
-const AuditPage = lazy(() =>
-  import("@/pages/admin/AuditPage").then((module) => ({ default: module.AuditPage })),
-);
-const NotFoundPage = lazy(() =>
-  import("@/pages/NotFoundPage").then((module) => ({ default: module.NotFoundPage })),
-);
-
-const load = (element: ReactNode, variant: RouteSkeletonVariant = "content") => (
-  <Suspense fallback={<RouteSkeleton variant={variant} />}>{element}</Suspense>
-);
+import { LoginPage } from "@/pages/LoginPage";
+import { DashboardPage } from "@/pages/DashboardPage";
+import { DocumentsPage } from "@/pages/DocumentsPage";
+import { TrashPage } from "@/pages/TrashPage";
+import { EditorPage } from "@/pages/EditorPage";
+import { UsersPage } from "@/pages/admin/UsersPage";
+import { AuditPage } from "@/pages/admin/AuditPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 
 export const router = createBrowserRouter([
   {
     path: "/login",
-    element: load(
+    element: (
       <PublicOnly>
         <LoginPage />
-      </PublicOnly>,
-      "login",
+      </PublicOnly>
     ),
   },
   {
     path: "/editor/:id",
-    element: load(
+    element: (
       <RequireAuth>
         <EditorPage />
-      </RequireAuth>,
-      "editor",
+      </RequireAuth>
     ),
   },
   {
     path: "/workspace",
-    element: load(
+    element: (
       <RequireAuth>
         <Navigate to="/documents" replace />
-      </RequireAuth>,
-      "workspace",
+      </RequireAuth>
     ),
   },
   {
@@ -73,27 +44,27 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
-      { path: "dashboard", element: load(<DashboardPage />) },
-      { path: "documents", element: load(<DocumentsPage />) },
-      { path: "shared", element: load(<DocumentsPage scope="shared" />) },
-      { path: "trash", element: load(<TrashPage />) },
+      { path: "dashboard", element: <DashboardPage /> },
+      { path: "documents", element: <DocumentsPage /> },
+      { path: "shared", element: <DocumentsPage scope="shared" /> },
+      { path: "trash", element: <TrashPage /> },
       {
         path: "admin/users",
-        element: load(
+        element: (
           <RequireRole roles={["ADMINISTRATOR"]}>
             <UsersPage />
-          </RequireRole>,
+          </RequireRole>
         ),
       },
       {
         path: "admin/audit",
-        element: load(
+        element: (
           <RequireRole roles={["ADMINISTRATOR"]}>
             <AuditPage />
-          </RequireRole>,
+          </RequireRole>
         ),
       },
-      { path: "*", element: load(<NotFoundPage />) },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);
