@@ -189,4 +189,21 @@ export class DocumentsController {
   ) {
     return this.documents.toggleStar(id, user);
   }
+
+  @Post(":id/merge")
+  merge(
+    @Param("id") id: string,
+    @Body("placeholders") placeholders: Record<string, string>,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.mergeWord(id, placeholders, user);
+  }
+
+  @Post(":id/convert-pdf")
+  convertPdf(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.convertPdf(id, user);
+  }
 }

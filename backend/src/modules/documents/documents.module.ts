@@ -16,6 +16,7 @@ import { NotificationsModule } from "../../core/notifications/notifications.modu
 import { DocumentCommentsController } from "./document-comments.controller";
 import { DocumentCommentsService } from "./document-comments.service";
 import { OperationsModule } from "../../integrations/operations/operations.module";
+import { ProcessorModule } from "../../integrations/processor/processor.module";
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { OperationsModule } from "../../integrations/operations/operations.modul
     StorageModule,
     NotificationsModule,
     OperationsModule,
+    ProcessorModule,
     JwtModule.register({}),
   ],
   controllers: [

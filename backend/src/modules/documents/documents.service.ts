@@ -4,15 +4,21 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from "@nestjs/common";
 import {
   DocumentStatus,
+  DocumentType,
+  ScanStatus,
   Prisma,
 } from "@prisma/client";
+import { randomUUID } from "crypto";
 import type { DocumentItem } from "@share";
 import type { AuthenticatedUser } from "../../core/auth/auth.types";
 import { PrismaService } from "../../database/prisma/prisma.service";
 import { StorageService } from "../../integrations/storage/storage.service";
+import { ProcessorService } from "../../integrations/processor/processor.service";
+import { OperationsService } from "../../integrations/operations/operations.service";
 import { DocumentAccessService, AuditAction } from "./document-access.service";
 import { DocumentPermissionsService } from "./document-permissions.service";
 import { DocumentVersionsService } from "./document-versions.service";
@@ -36,6 +42,8 @@ export class DocumentsService {
     private readonly accessService: DocumentAccessService,
     private readonly permissionsService: DocumentPermissionsService,
     private readonly versionsService: DocumentVersionsService,
+    private readonly processor: ProcessorService,
+    @Optional() private readonly operations?: OperationsService,
   ) {}
 
   async list(
@@ -366,5 +374,135 @@ export class DocumentsService {
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;
+  }
+
+  async mergeWord(
+    id: string,
+    placeholders: Record<string, string>,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    const ownedDocument = await this.ensureOwnedDocument(id, user);
+    
+    const latestVersion = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id },
+      orderBy: { version: "desc" },
+    });
+    if (!latestVersion) {
+      throw new BadRequestException("Document has no uploaded version to merge");
+    }
+
+    const nextVersionNum = ownedDocument.version + 1;
+    const outputKey = `documents/${user.id}/${id}/version-${nextVersionNum}.docx`;
+
+    await this.processor.mergeWord(
+      latestVersion.objectKey,
+      outputKey,
+      placeholders
+    );
+
+    const head = await this.storage.headObject(outputKey);
+    const sizeBytes = BigInt(head.ContentLength ?? 0);
+
+    const updatedDoc = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.document.update({
+        where: { id },
+        data: {
+          version: { increment: 1 },
+          updatedAt: new Date(),
+        },
+      });
+
+      const createdVersion = await tx.documentVersion.create({
+        data: {
+          documentId: id,
+          version: nextVersionNum,
+          objectKey: outputKey,
+          sizeBytes,
+          checksum: head.ETag?.replaceAll('"', "") ?? null,
+          authorId: user.id,
+          scanStatus: ScanStatus.PENDING,
+        },
+      });
+
+      return tx.document.update({
+        where: { id },
+        data: {
+          currentVersionId: createdVersion.id,
+          status: DocumentStatus.READY,
+        },
+        include: DocumentMapper.publicInclude(this.accessService, user),
+      });
+    });
+
+    if (this.operations && updatedDoc.currentVersionId) {
+      await this.operations.enqueueMalwareScan(updatedDoc.currentVersionId);
+    }
+
+    return DocumentMapper.toPublicItem(updatedDoc, user.id);
+  }
+
+  async convertPdf(
+    id: string,
+    user: AuthenticatedUser,
+  ): Promise<DocumentItem> {
+    const ownedDocument = await this.ensureOwnedDocument(id, user);
+    
+    const latestVersion = await this.prisma.documentVersion.findFirst({
+      where: { documentId: id },
+      orderBy: { version: "desc" },
+    });
+    if (!latestVersion) {
+      throw new BadRequestException("Document has no uploaded version to convert");
+    }
+
+    const newDocId = randomUUID();
+    const outputKey = `documents/${user.id}/${newDocId}/version-1.pdf`;
+
+    await this.processor.convertPdf(latestVersion.objectKey, outputKey);
+
+    const head = await this.storage.headObject(outputKey);
+    const sizeBytes = BigInt(head.ContentLength ?? 0);
+
+    const pdfName = ownedDocument.name.includes(".")
+      ? `${ownedDocument.name.slice(0, ownedDocument.name.lastIndexOf("."))}.pdf`
+      : `${ownedDocument.name}.pdf`;
+
+    const pdfDoc = await this.prisma.$transaction(async (tx) => {
+      await tx.document.create({
+        data: {
+          id: newDocId,
+          name: pdfName,
+          type: DocumentType.PDF,
+          ownerId: user.id,
+          status: DocumentStatus.READY,
+        },
+      });
+
+      const version = await tx.documentVersion.create({
+        data: {
+          documentId: newDocId,
+          version: 1,
+          objectKey: outputKey,
+          sizeBytes,
+          checksum: head.ETag?.replaceAll('"', "") ?? null,
+          authorId: user.id,
+          scanStatus: ScanStatus.PENDING,
+        },
+      });
+
+      return tx.document.update({
+        where: { id: newDocId },
+        data: {
+          currentVersionId: version.id,
+        },
+        include: DocumentMapper.publicInclude(this.accessService, user),
+      });
+    });
+
+    if (this.operations && pdfDoc.currentVersionId) {
+      await this.operations.enqueueMalwareScan(pdfDoc.currentVersionId);
+    }
+
+    return DocumentMapper.toPublicItem(pdfDoc, user.id);
   }
 }

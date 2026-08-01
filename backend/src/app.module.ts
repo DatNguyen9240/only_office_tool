@@ -19,6 +19,7 @@ import { TagsModule } from "./modules/tags/tags.module";
 import { TemplatesModule } from "./modules/templates/templates.module";
 import { AiModule } from "./integrations/ai/ai.module";
 import { WebhooksModule } from "./integrations/webhooks/webhooks.module";
+import { ProcessorModule } from "./integrations/processor/processor.module";
 
 function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   const requiredKeys = [
@@ -71,6 +72,7 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
     TemplatesModule,
     AiModule,
     WebhooksModule,
+    ProcessorModule,
   ],
   providers: [
     {
