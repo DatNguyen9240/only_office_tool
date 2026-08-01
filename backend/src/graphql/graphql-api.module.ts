@@ -11,6 +11,7 @@ import { FoldersModule } from "../modules/folders/folders.module";
 import { SearchModule } from "../modules/search/search.module";
 import { GqlJwtAuthGuard, GqlRolesGuard } from "./graphql-auth";
 import { createGraphqlLoaders } from "./graphql.loaders";
+import { createGraphqlOperationAllowlistPlugin } from "./operation-allowlist";
 import { operationLimitRule } from "./operation-limit.rule";
 import {
   DocumentFieldsResolver,
@@ -40,6 +41,7 @@ import { WorkspaceQueryService } from "./workspace-query.service";
         introspection: process.env.NODE_ENV !== "production",
         includeStacktraceInErrorResponses: process.env.NODE_ENV !== "production",
         validationRules: [operationLimitRule(8, 250)],
+        plugins: [createGraphqlOperationAllowlistPlugin()],
         context: ({ req, res }: { req: Request; res: Response }) => ({
           req,
           res,

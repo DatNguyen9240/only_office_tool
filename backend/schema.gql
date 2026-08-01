@@ -109,6 +109,7 @@ type SearchResultType {
   documents: [Document!]!
   folders: [FolderType!]!
   people: [PersonType!]!
+  pageInfo: PageInfoType!
 }
 
 type MutationStatusType {
@@ -136,7 +137,7 @@ type Query {
   documents(scope: DocumentScope! = ALL, folderId: String, search: String, first: Int! = 20, after: String): DocumentConnectionType!
   document(id: ID!): Document!
   folders: [FolderType!]!
-  search(query: String!, first: Int! = 20): SearchResultType!
+  search(query: String!, first: Int! = 20, after: String): SearchResultType!
   documentPermissions(id: ID!): [PermissionEntryType!]!
 }
 

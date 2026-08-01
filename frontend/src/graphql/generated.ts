@@ -44,10 +44,11 @@ export type FoldersQuery = { folders: Array<{ id: string, name: string, parentId
 export type SearchQueryVariables = Exact<{
   query: string;
   first: number;
+  after?: string | null | undefined;
 }>;
 
 
-export type SearchQuery = { search: { documents: Array<{ id: string, version: number, name: string, type: string, owner: string, modifiedAt: string, size: string, status: string, folderId: string, shared: boolean, starred: boolean | null, permission: string | null, tags: Array<{ id: string, name: string, color: string | null }>, viewerCapabilities: { canView: boolean, canComment: boolean, canEdit: boolean, canShare: boolean, canDelete: boolean } }>, folders: Array<{ id: string, name: string, parentId: string | null }>, people: Array<{ id: string, name: string, email: string, department: string | null }> } };
+export type SearchQuery = { search: { documents: Array<{ id: string, version: number, name: string, type: string, owner: string, modifiedAt: string, size: string, status: string, folderId: string, shared: boolean, starred: boolean | null, permission: string | null, tags: Array<{ id: string, name: string, color: string | null }>, viewerCapabilities: { canView: boolean, canComment: boolean, canEdit: boolean, canShare: boolean, canDelete: boolean } }>, folders: Array<{ id: string, name: string, parentId: string | null }>, people: Array<{ id: string, name: string, email: string, department: string | null }>, pageInfo: { hasNextPage: boolean, endCursor: string | null } } };
 
 export type WorkspaceQueryVariables = Exact<{ [key: string]: never; }>;
 

@@ -77,11 +77,17 @@ export class WorkspaceQueryService {
     return this.foldersService.list(user);
   }
 
-  async search(query: string, user: AuthenticatedUser, first: number) {
+  async search(
+    query: string,
+    user: AuthenticatedUser,
+    first: number,
+    after?: string,
+  ) {
     const result = await this.searchService.search(
       query,
       user,
       Math.min(Math.max(first, 1), 50),
+      after,
     );
     return {
       ...result,

@@ -10,7 +10,7 @@
     "start:dev": "tsx watch src/main.ts",
     "graphql:schema": "npm run build && node dist/scripts/generate-graphql-schema.js",
     "typecheck": "tsc -p tsconfig.json --noEmit --incremental false",
-    "test": "tsx --test test/security.test.ts",
+    "test": "tsx --test test/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:deploy": "prisma migrate deploy",

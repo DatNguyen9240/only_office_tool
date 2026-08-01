@@ -241,6 +241,8 @@ export class SearchResultType {
   folders!: FolderType[];
   @Field(() => [PersonType])
   people!: PersonType[];
+  @Field(() => PageInfoType)
+  pageInfo!: PageInfoType;
 }
 
 @ObjectType()

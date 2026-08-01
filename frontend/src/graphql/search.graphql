@@ -1,5 +1,5 @@
-query Search($query: String!, $first: Int!) {
-  search(query: $query, first: $first) {
+query Search($query: String!, $first: Int!, $after: String) {
+  search(query: $query, first: $first, after: $after) {
     documents {
       id version name type owner modifiedAt size status folderId shared starred
       permission tags { id name color }
@@ -7,5 +7,6 @@ query Search($query: String!, $first: Int!) {
     }
     folders { id name parentId }
     people { id name email department }
+    pageInfo { hasNextPage endCursor }
   }
 }

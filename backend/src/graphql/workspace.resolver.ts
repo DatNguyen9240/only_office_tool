@@ -88,9 +88,10 @@ export class WorkspaceResolver {
   search(
     @Args("query") query: string,
     @Args("first", { type: () => Int, defaultValue: 20 }) first: number,
+    @Args("after", { type: () => String, nullable: true }) after: string | undefined,
     @GqlCurrentUser() user: AuthenticatedUser,
   ) {
-    return this.queries.search(query, user, first);
+    return this.queries.search(query, user, first, after);
   }
 
   @Query(() => [PermissionEntryType])

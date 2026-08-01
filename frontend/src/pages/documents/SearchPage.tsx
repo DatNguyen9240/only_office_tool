@@ -4,8 +4,8 @@ import {
   UserOutlined,
 } from "@ant-design/icons";
 import { PageContainer, ProCard } from "@ant-design/pro-components";
-import { useQuery } from "@tanstack/react-query";
-import { Avatar, Empty, Input, List, Tabs, Typography } from "antd";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { Avatar, Button, Empty, Input, List, Tabs, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { DocumentItem } from "@share";
@@ -22,6 +22,7 @@ interface SearchResponse {
     email: string;
     department: string | null;
   }>;
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
 }
 
 interface SearchGraphqlResponse {
@@ -33,15 +34,44 @@ export function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const [draft, setDraft] = useState(query);
-  const { data, isLoading } = useQuery({
-    queryKey: ["search", query],
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery<
+    SearchGraphqlResponse,
+    Error,
+    SearchResponse,
+    readonly ["search", string],
+    string | null
+  >({
+    queryKey: ["search", query] as const,
+    initialPageParam: null,
     enabled: Boolean(query.trim()),
-    queryFn: ({ signal }) =>
-      graphqlRequest<SearchGraphqlResponse, { query: string; first: number }>(
+    queryFn: ({ pageParam, signal }) =>
+      graphqlRequest<
+        SearchGraphqlResponse,
+        { query: string; first: number; after?: string | null }
+      >(
         searchQuery,
-        { query, first: 50 },
+        { query, first: 50, ...(pageParam ? { after: pageParam } : {}) },
         { operationName: "Search", signal },
-      ).then((response) => response.search),
+      ),
+    getNextPageParam: (lastPage) =>
+      lastPage.search.pageInfo.hasNextPage
+        ? lastPage.search.pageInfo.endCursor ?? undefined
+        : undefined,
+    select: (response) => ({
+      documents: response.pages.flatMap((page) => page.search.documents),
+      folders: response.pages.flatMap((page) => page.search.folders),
+      people: response.pages.flatMap((page) => page.search.people),
+      pageInfo: response.pages[response.pages.length - 1]?.search.pageInfo ?? {
+        hasNextPage: false,
+        endCursor: null,
+      },
+    }),
   });
 
   return (
@@ -113,7 +143,7 @@ export function SearchPage() {
                         description={
                           <Typography.Text type="secondary">
                             {person.email}
-                            {person.department ? ` · ${person.department}` : ""}
+                            {person.department ? ` - ${person.department}` : ""}
                           </Typography.Text>
                         }
                       />
@@ -124,6 +154,16 @@ export function SearchPage() {
             },
           ]}
         />
+        {hasNextPage && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+            <Button
+              loading={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+            >
+              Load more
+            </Button>
+          </div>
+        )}
       </ProCard>
     </PageContainer>
   );
