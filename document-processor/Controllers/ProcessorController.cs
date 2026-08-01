@@ -25,7 +25,7 @@ public class ProcessorController : ControllerBase
     static ProcessorController()
     {
         // Set EPPlus License Context
-        ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
+        ExcelPackage.License.SetNonCommercialPersonal("Meridian DMS");
     }
 
     public ProcessorController(IConfiguration configuration)
@@ -58,8 +58,9 @@ public class ProcessorController : ControllerBase
             // 2. Perform OpenXML merge
             using (var doc = WordprocessingDocument.Open(templateStream, true))
             {
-                var body = doc.MainDocumentPart?.Document.Body;
-                if (body != null)
+                var mainPart = doc.MainDocumentPart;
+                var body = mainPart?.Document?.Body;
+                if (mainPart != null && mainPart.Document != null && body != null)
                 {
                     foreach (var text in body.Descendants<Text>())
                     {
@@ -71,7 +72,7 @@ public class ProcessorController : ControllerBase
                             }
                         }
                     }
-                    doc.MainDocumentPart.Document.Save();
+                    mainPart.Document.Save();
                 }
             }
 
@@ -196,14 +197,15 @@ public class ProcessorController : ControllerBase
             {
                 if (process == null) throw new Exception("Failed to start LibreOffice process.");
                 
-                string stdout = await process.StandardOutput.ReadToEndAsync();
-                string stderr = await process.StandardError.ReadToEndAsync();
+                var stdoutTask = process.StandardOutput.ReadToEndAsync();
+                var stderrTask = process.StandardError.ReadToEndAsync();
                 
+                await Task.WhenAll(stdoutTask, stderrTask);
                 process.WaitForExit();
 
                 if (process.ExitCode != 0)
                 {
-                    throw new Exception($"LibreOffice exited with code {process.ExitCode}. Error: {stderr}");
+                    throw new Exception($"LibreOffice exited with code {process.ExitCode}. Error: {stderrTask.Result}");
                 }
             }
 

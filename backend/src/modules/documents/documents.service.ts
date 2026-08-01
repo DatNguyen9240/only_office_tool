@@ -370,7 +370,7 @@ export class DocumentsService {
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.accessService.ownerWhere(user) },
-      select: { id: true, name: true, ownerId: true, version: true, starred: true },
+      select: { id: true, name: true, ownerId: true, version: true, starred: true, folderId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;
@@ -474,6 +474,7 @@ export class DocumentsService {
           name: pdfName,
           type: DocumentType.PDF,
           ownerId: user.id,
+          folderId: ownedDocument.folderId,
           status: DocumentStatus.READY,
         },
       });
