@@ -17,6 +17,7 @@ export default async function handler(req, res) {
   // Thu thập toàn bộ query parameters ngoại trừ "path" để chuyển tiếp lên backend
   const queryParams = { ...req.query };
   delete queryParams.path;
+  delete queryParams.proxied;
   const searchParams = new URLSearchParams(queryParams);
   const qs = searchParams.toString();
 

@@ -8,16 +8,16 @@ import {
 } from "@nestjs/common";
 import type { ConfigService } from "@nestjs/config";
 import type { JwtService } from "@nestjs/jwt";
-import type { PrismaService } from "../src/prisma/prisma.service";
-import { StorageService } from "../src/storage/storage.service";
-import type { AuditService } from "../src/audit/audit.service";
-import { AdminService } from "../src/admin/admin.service";
-import { AuthService } from "../src/auth/auth.service";
-import { DocumentAccessService } from "../src/documents/document-access.service";
-import { DocumentPermissionsService } from "../src/documents/document-permissions.service";
-import { OnlyOfficeService } from "../src/documents/onlyoffice.service";
-import { FilesService } from "../src/files/files.service";
-import { FoldersService } from "../src/folders/folders.service";
+import type { PrismaService } from "../src/database/prisma/prisma.service";
+import { StorageService } from "../src/integrations/storage/storage.service";
+import type { AuditService } from "../src/core/audit/audit.service";
+import { AdminService } from "../src/core/admin/admin.service";
+import { AuthService } from "../src/core/auth/auth.service";
+import { DocumentAccessService } from "../src/modules/documents/document-access.service";
+import { DocumentPermissionsService } from "../src/modules/documents/document-permissions.service";
+import { OnlyOfficeService } from "../src/modules/documents/onlyoffice.service";
+import { FilesService } from "../src/modules/files/files.service";
+import { FoldersService } from "../src/modules/folders/folders.service";
 
 const user = {
   id: "user-1",
@@ -38,6 +38,7 @@ test("permission removal cannot target another document", async () => {
   const service = new DocumentPermissionsService(
     prisma,
     new DocumentAccessService(),
+    {} as any,
   );
 
   await assert.rejects(
