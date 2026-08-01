@@ -10,7 +10,8 @@ import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { DocumentItem } from "@share";
 import { FileTable } from "@/components/file/Explorer/FileTable";
-import { apiRequest } from "@/lib/api";
+import { graphqlRequest } from "@/lib/graphql";
+import searchQuery from "@/graphql/search.graphql?raw";
 
 interface SearchResponse {
   documents: DocumentItem[];
@@ -23,6 +24,10 @@ interface SearchResponse {
   }>;
 }
 
+interface SearchGraphqlResponse {
+  search: SearchResponse;
+}
+
 export function SearchPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -32,9 +37,11 @@ export function SearchPage() {
     queryKey: ["search", query],
     enabled: Boolean(query.trim()),
     queryFn: ({ signal }) =>
-      apiRequest<SearchResponse>(`/search?q=${encodeURIComponent(query)}`, {
-        signal,
-      }),
+      graphqlRequest<SearchGraphqlResponse, { query: string; first: number }>(
+        searchQuery,
+        { query, first: 50 },
+        { operationName: "Search", signal },
+      ).then((response) => response.search),
   });
 
   return (

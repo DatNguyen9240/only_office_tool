@@ -56,6 +56,10 @@ async function refreshTokens(): Promise<AuthTokensResponse | undefined> {
   });
 }
 
+export async function refreshApiSession(): Promise<boolean> {
+  return Boolean(await refreshTokens());
+}
+
 let refreshPromise: Promise<AuthTokensResponse | undefined> | undefined;
 
 async function performRefresh(): Promise<AuthTokensResponse | undefined> {

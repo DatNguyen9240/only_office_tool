@@ -1,0 +1,11 @@
+query Search($query: String!, $first: Int!) {
+  search(query: $query, first: $first) {
+    documents {
+      id version name type owner modifiedAt size status folderId shared starred
+      permission tags { id name color }
+      viewerCapabilities { canView canComment canEdit canShare canDelete }
+    }
+    folders { id name parentId }
+    people { id name email department }
+  }
+}

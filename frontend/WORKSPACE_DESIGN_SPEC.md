@@ -272,6 +272,18 @@ Ant Design Pro is used where it improves product structure and data behavior. Th
 
 Right click a file to access Open, Rename, Move, Share, Download, Version history, and Delete. Menu order follows frequency, with destructive actions separated at the bottom.
 
+### Document processing (Merge & PDF)
+
+1. Select a document.
+2. In the details drawer, Context Menu, or action bar, select "Merge Word" or "Convert to PDF".
+3. For Word merging:
+   - Input placeholder mappings in the provided form.
+   - Confirm and trigger the action.
+   - The UI shows a loading state, then inserts the newly merged file version.
+4. For PDF conversion:
+   - Click "Convert to PDF".
+   - Upon successful conversion, the UI inserts the new `.pdf` document alongside the original document in the active folder.
+
 ### Version recovery
 
 1. Open the Versions tab in document details or choose Version history.

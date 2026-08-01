@@ -17,6 +17,7 @@ import { DocumentCommentsController } from "./document-comments.controller";
 import { DocumentCommentsService } from "./document-comments.service";
 import { OperationsModule } from "../../integrations/operations/operations.module";
 import { ProcessorModule } from "../../integrations/processor/processor.module";
+import { DocumentCapabilitiesService } from "./document-capabilities.service";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { ProcessorModule } from "../../integrations/processor/processor.module";
     DocumentAuditListener,
     ShareLinksService,
     DocumentCommentsService,
+    DocumentCapabilitiesService,
   ],
   exports: [
     DocumentsService,
@@ -50,6 +52,7 @@ import { ProcessorModule } from "../../integrations/processor/processor.module";
     DocumentVersionsService,
     OnlyOfficeService,
     DocumentAuditListener,
+    DocumentCapabilitiesService,
   ],
 })
 export class DocumentsModule {}

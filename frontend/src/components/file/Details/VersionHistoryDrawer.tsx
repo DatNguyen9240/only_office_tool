@@ -28,7 +28,7 @@ interface VersionItem {
 
 interface VersionHistoryDrawerProps {
   open: boolean;
-  document?: DocumentItem;
+  document?: DocumentItem & { versions?: VersionItem[] };
   onClose: () => void;
 }
 
@@ -56,6 +56,11 @@ export function VersionHistoryDrawer({
       setVersionList([]);
       return;
     }
+    if (document.versions?.length) {
+      setVersionList(document.versions);
+      setLoading(false);
+      return;
+    }
     setVersionList([]);
     setLoading(true);
     apiRequest<VersionItem[]>(`/documents/${document.id}/versions`)
@@ -66,7 +71,7 @@ export function VersionHistoryDrawer({
         message.error(translateApiError(text, locale));
       })
       .finally(() => setLoading(false));
-  }, [document?.id, locale, message, open]);
+  }, [document?.id, document?.versions, locale, message, open]);
 
   const handleRestore = async (version: number) => {
     if (!document?.id) return;

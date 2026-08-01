@@ -1,11 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
-import type { DashboardResponse } from "@share";
-import { apiRequest } from "@/lib/api";
+import { useWorkspace } from "@/hooks/useWorkspace";
 
 export function useDashboard() {
-  return useQuery({
-    queryKey: ["dashboard"],
-    queryFn: ({ signal }) =>
-      apiRequest<DashboardResponse>("/dashboard", { signal }),
-  });
+  const workspace = useWorkspace();
+  return { ...workspace, data: workspace.data?.dashboard };
 }

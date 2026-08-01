@@ -32,6 +32,11 @@ type DocumentScope =
   | "recent"
   | "favorites";
 
+export interface DocumentConnection {
+  nodes: DocumentItem[];
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+}
+
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -53,24 +58,7 @@ export class DocumentsService {
     search?: string,
     limit = 100,
   ): Promise<DocumentItem[]> {
-    const where: Prisma.DocumentWhereInput = {
-      ...(scope === "trash"
-        ? { deletedAt: { not: null } }
-        : { deletedAt: null }),
-      ...(folderId ? { folderId } : {}),
-      ...(search
-        ? { name: { contains: search, mode: "insensitive" } }
-        : {}),
-      ...(scope === "shared"
-        ? {
-            ownerId: { not: user.id },
-            permissions: { some: this.accessService.permissionWhere(user) },
-          }
-        : this.accessService.accessWhere(user)),
-      ...(scope === "favorites"
-        ? { favorites: { some: { userId: user.id } } }
-        : {}),
-    };
+    const where = this.buildListWhere(scope, user, { folderId, search });
 
     const documents = await this.prisma.document.findMany({
       where,
@@ -105,6 +93,126 @@ export class DocumentsService {
     return DocumentMapper.toPublicItem(document, user.id);
   }
 
+  /** Bounded, cursor-based document listing for read clients. */
+  async listConnection(
+    scope: DocumentScope,
+    user: AuthenticatedUser,
+    options: {
+      folderId?: string;
+      search?: string;
+      first?: number;
+      after?: string;
+    } = {},
+  ): Promise<DocumentConnection> {
+    const first = Math.min(Math.max(options.first ?? 20, 1), 50);
+    const cursor = this.decodeCursor(options.after);
+    const where = this.buildListWhere(scope, user, {
+      folderId: options.folderId,
+      search: options.search,
+      cursor,
+    });
+    const records = await this.prisma.document.findMany({
+      where,
+      include: DocumentMapper.publicInclude(this.accessService, user),
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+      take: first + 1,
+    });
+    const hasNextPage = records.length > first;
+    const page = hasNextPage ? records.slice(0, first) : records;
+    const last = page.at(-1);
+    return {
+      nodes: page.map((document) =>
+        DocumentMapper.toPublicItem(document, user.id),
+      ),
+      pageInfo: {
+        hasNextPage,
+        endCursor: last ? this.encodeCursor(last.updatedAt, last.id) : null,
+      },
+    };
+  }
+
+  private encodeCursor(updatedAt: Date, id: string): string {
+    return Buffer.from(
+      JSON.stringify({ updatedAt: updatedAt.toISOString(), id }),
+    ).toString("base64url");
+  }
+
+  private decodeCursor(
+    cursor?: string,
+  ): { updatedAt: Date; id: string } | undefined {
+    if (!cursor) return undefined;
+    try {
+      const parsed = JSON.parse(
+        Buffer.from(cursor, "base64url").toString("utf8"),
+      ) as { updatedAt?: unknown; id?: unknown };
+      const updatedAt =
+        typeof parsed.updatedAt === "string"
+          ? new Date(parsed.updatedAt)
+          : undefined;
+      if (
+        !updatedAt ||
+        Number.isNaN(updatedAt.getTime()) ||
+        typeof parsed.id !== "string" ||
+        !parsed.id
+      ) {
+        throw new Error("invalid cursor");
+      }
+      return { updatedAt, id: parsed.id };
+    } catch {
+      throw new BadRequestException("Invalid document cursor");
+    }
+  }
+
+  private buildListWhere(
+    scope: DocumentScope,
+    user: AuthenticatedUser,
+    options: {
+      folderId?: string;
+      search?: string;
+      cursor?: { updatedAt: Date; id: string };
+    } = {},
+  ): Prisma.DocumentWhereInput {
+    const filters: Prisma.DocumentWhereInput[] = [
+      scope === "trash"
+        ? { deletedAt: { not: null } }
+        : { deletedAt: null },
+    ];
+
+    if (options.folderId) filters.push({ folderId: options.folderId });
+    if (options.search) {
+      filters.push({
+        name: { contains: options.search, mode: "insensitive" },
+      });
+    }
+
+    if (scope === "trash") {
+      filters.push(this.accessService.ownerWhere(user));
+    } else if (scope === "shared") {
+      filters.push({ ownerId: { not: user.id } });
+      filters.push(this.accessService.accessWhere(user));
+    } else {
+      filters.push(this.accessService.accessWhere(user));
+    }
+
+    if (scope === "favorites") {
+      filters.push({ favorites: { some: { userId: user.id } } });
+    }
+
+    if (options.cursor) {
+      filters.push({
+        OR: [
+          { updatedAt: { lt: options.cursor.updatedAt } },
+          {
+            updatedAt: options.cursor.updatedAt,
+            id: { lt: options.cursor.id },
+          },
+        ],
+      });
+    }
+
+    return { AND: filters };
+  }
+
   async update(
     id: string,
     input: UpdateDocumentDto,
@@ -134,7 +242,6 @@ export class DocumentsService {
         data: {
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.folderId === undefined ? {} : { folderId: input.folderId }),
-          ...(input.starred === undefined ? {} : { starred: input.starred }),
           version: { increment: 1 },
         },
         include: DocumentMapper.publicInclude(this.accessService, user),
@@ -370,7 +477,7 @@ export class DocumentsService {
   private async ensureOwnedDocument(id: string, user: AuthenticatedUser) {
     const document = await this.prisma.document.findFirst({
       where: { id, ...this.accessService.ownerWhere(user) },
-      select: { id: true, name: true, ownerId: true, version: true, starred: true, folderId: true },
+      select: { id: true, name: true, ownerId: true, version: true, folderId: true },
     });
     if (!document) throw new NotFoundException("Document not found");
     return document;

@@ -9,5 +9,6 @@ import { IndexingModule } from "../../integrations/indexing/indexing.module";
   imports: [PrismaModule, DocumentsModule, IndexingModule],
   controllers: [SearchController],
   providers: [SearchService],
+  exports: [SearchService],
 })
 export class SearchModule {}

@@ -10,7 +10,7 @@ export class MailService {
   private readonly from: string;
 
   constructor(
-    config: ConfigService,
+    @Inject(ConfigService) config: ConfigService,
     @Inject(forwardRef(() => OperationsService))
     private readonly operations: OperationsService,
   ) {

@@ -5,10 +5,24 @@ Ant Design Pro, Zustand, and TanStack Query.
 
 ## Run locally
 
+### Frontend
 ```bash
 cd frontend
 npm install
 npm run dev
+```
+
+### Backend (NestJS)
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+### Document Processor (C# / .NET 10)
+```bash
+cd document-processor
+dotnet run
 ```
 
 ## Deployment
@@ -120,6 +134,7 @@ URL for saving new versions.
 - `frontend/src/i18n`: typed English and Vietnamese translation resources
 - `frontend/src/hooks`: TanStack Query data access and API integration
 - `backend`: NestJS backend foundation and Prisma schema
+- `document-processor`: C# .NET 10 microservice for document merging, Excel generation, and PDF conversion
 - `share`: shared public API types used by frontend and backend
 - `frontend/DESIGN_SPEC.md`: product design and UX specification
 - `frontend/WORKSPACE_DESIGN_SPEC.md`: employee workspace design system and UX flows

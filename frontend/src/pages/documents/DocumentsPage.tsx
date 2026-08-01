@@ -39,8 +39,8 @@ import { SearchBar } from "@/components/file/Search/SearchBar";
 import { SharePermissionModal } from "@/components/file/Permissions/SharePermissionModal";
 import { UploadModal } from "@/components/file/Upload/UploadModal";
 import { VersionHistoryDrawer } from "@/components/file/Details/VersionHistoryDrawer";
-import { useDocuments } from "@/hooks/useDocuments";
-import { useFolders, type FolderItem } from "@/hooks/useFolders";
+import { useDocumentBrowser } from "@/hooks/useDocumentBrowser";
+import type { FolderItem } from "@/hooks/useFolders";
 import { translateApiError, useI18n } from "@/i18n";
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { useAppStore } from "@/store/useAppStore";
@@ -82,8 +82,31 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const [batchTargetFolder, setBatchTargetFolder] = useState("all");
   const [batchShareEmail, setBatchShareEmail] = useState("");
   const [batchShareRole, setBatchShareRole] = useState("VIEWER");
-  const { data = [], isLoading } = useDocuments(scope);
-  const { data: folders = [] } = useFolders();
+  const {
+    selectedFolderId,
+    setSelectedFolderId,
+    selectedDocumentId,
+    selectDocument,
+    viewMode,
+    setViewMode,
+    previewOpen,
+    setPreviewOpen,
+  } = useAppStore();
+  const serverFolderId =
+    scope === "all" && selectedFolderId !== "all" ? selectedFolderId : undefined;
+  const serverSearch = query.trim() || undefined;
+  const {
+    data: browser,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useDocumentBrowser(scope, {
+    folderId: serverFolderId,
+    search: serverSearch,
+  });
+  const data = browser?.documents ?? [];
+  const folders = browser?.folders ?? [];
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return;
@@ -95,6 +118,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           body: JSON.stringify({ name: newFolderName.trim() }),
         });
         await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["documents"] });
         message.success("Folder renamed");
       } else if (isApiConfigured) {
         await apiRequest("/folders", {
@@ -105,6 +129,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           }),
         });
         await queryClient.invalidateQueries({ queryKey: ["folders"] });
+        await queryClient.invalidateQueries({ queryKey: ["documents"] });
         message.success(`Đã tạo thư mục "${newFolderName}"`);
       }
       setNewFolderName("");
@@ -117,17 +142,6 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       setCreatingFolder(false);
     }
   };
-  const {
-    selectedFolderId,
-    setSelectedFolderId,
-    selectedDocumentId,
-    selectDocument,
-    viewMode,
-    setViewMode,
-    previewOpen,
-    setPreviewOpen,
-  } = useAppStore();
-
   useEffect(() => {
     setQuery(searchParams.get("q") ?? "");
     if (scope === "all") {
@@ -148,9 +162,10 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
 
   const deleteFolder = async (folder: FolderItem) => {
     try {
-      await apiRequest(`/folders/${folder.id}`, { method: "DELETE" });
-      await queryClient.invalidateQueries({ queryKey: ["folders"] });
-      if (selectedFolderId === folder.id) setSelectedFolderId("all");
+        await apiRequest(`/folders/${folder.id}`, { method: "DELETE" });
+        await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
+        if (selectedFolderId === folder.id) setSelectedFolderId("all");
       message.success("Folder deleted");
     } catch (error) {
       const text = error instanceof Error ? error.message : "Folder deletion failed";
@@ -168,6 +183,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
         }),
       });
       await queryClient.invalidateQueries({ queryKey: ["folders"] });
+      await queryClient.invalidateQueries({ queryKey: ["documents"] });
       message.success("Folder moved");
       setMovingFolder(undefined);
     } catch (error) {
@@ -179,15 +195,10 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const filtered = useMemo(
     () =>
       data.filter((document) => {
-        const folderMatch =
-          scope !== "all" || selectedFolderId === "all"
-            ? true
-            : document.folderId === selectedFolderId;
-        const queryMatch = document.name.toLowerCase().includes(query.toLowerCase());
         const typeMatch = typeFilter === "all" || document.type === typeFilter;
-        return folderMatch && queryMatch && typeMatch;
+        return typeMatch;
       }),
-    [data, query, scope, selectedFolderId, typeFilter],
+    [data, typeFilter],
   );
 
   const selectedDocument = data.find((item) => item.id === selectedDocumentId);
@@ -335,6 +346,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const folderPanel = (
     <FolderTree
       selectedId={selectedFolderId}
+      folders={folders}
       onSelect={(id) => {
         setSelectedFolderId(id);
         setFolderDrawerOpen(false);
@@ -550,6 +562,16 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
               ))}
             </div>
           )}
+          {hasNextPage && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+              <Button
+                loading={isFetchingNextPage}
+                onClick={() => void fetchNextPage()}
+              >
+                Load more
+              </Button>
+            </div>
+          )}
         </section>
         {showPreview && (
           <DocumentPreview
@@ -636,6 +658,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       <UploadModal
         open={uploadOpen}
         directory={uploadDirectory}
+        folders={folders}
         onClose={() => {
           setUploadOpen(false);
           setUploadDirectory(false);

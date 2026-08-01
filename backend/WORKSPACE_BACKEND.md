@@ -12,11 +12,11 @@ dashboard metrics, user administration, and audit history.
 React/Vite        http://localhost:5173
         |
         v
-NestJS API        http://localhost:3000
-   |          |             |
+NestJS API ◄───────► Document Processor (C#)
+   |          |      http://localhost:5001 / :8080
    v          v             v
 PostgreSQL   MinIO        ONLYOFFICE Docs
- :5432       :9000        http://localhost:<port>
+  :5432       :9000        http://localhost:<port>
                   |
                   v
                 Redis
@@ -37,6 +37,7 @@ the future queue implementation.
 | MinIO/S3 | Original files and document versions | `http://localhost:9000` |
 | Redis | Cache, rate limits, background job queue | `localhost:6379` |
 | ONLYOFFICE Docs | Browser document editing and conversion | `http://localhost:<port>` |
+| Document Processor (C#) | Heavy document processing (Word merge, Excel generation, PDF conversion) | `http://localhost:5001` / `8080` |
 | Nginx | Reverse proxy and TLS termination in production | `80/443` |
 
 ## Suggested Backend Stack
@@ -152,8 +153,9 @@ DELETE /documents/:id
 POST   /documents/:id/restore
 POST   /documents/:id/star
 DELETE /documents/:id/permanent
-POST   /documents/:id/star
 GET    /documents/:id/download
+POST   /documents/:id/merge
+POST   /documents/:id/convert-pdf
 
 GET    /documents/:id/versions
 POST   /documents/:id/versions/:versionId/restore
@@ -197,6 +199,24 @@ where practical (`id`, `name`, `type`, `modifiedAt`, `folderId`, `shared`,
 
 The document URL must be reachable from the ONLYOFFICE process. Never expose a
 permanent public URL for private documents; use short-lived signed URLs.
+
+## Document Processor Integration Flow
+
+The C# microservice handles resource-heavy processing tasks asynchronously or synchronously from NestJS endpoints:
+
+### Word Document Merging (`POST /documents/:id/merge`)
+1. Frontend posts placeholders mapping to NestJS.
+2. NestJS retrieves the latest document version `objectKey` from the DB.
+3. NestJS sends a request containing the source template key, output key, and placeholders to the C# service.
+4. The C# service downloads the file from MinIO, applies OpenXML merge, saves it back, and returns success.
+5. NestJS increments the document version, creates a new `DocumentVersion` in PostgreSQL using the merged file size, and updates `currentVersionId`.
+
+### PDF Conversion (`POST /documents/:id/convert-pdf`)
+1. Frontend triggers PDF conversion.
+2. NestJS locates the latest version key.
+3. NestJS delegates conversion to the C# service.
+4. The C# service runs headless LibreOffice inside Docker to convert the document and uploads the PDF back to S3.
+5. NestJS registers a brand-new PDF `Document` and `DocumentVersion` under the same directory/folder as the source file.
 
 ## Environment Variables
 

@@ -4,6 +4,7 @@ export type PermissionRole = "Viewer" | "Commenter" | "Editor" | "Owner";
 
 export interface DocumentItem {
   id: string;
+  version: number;
   name: string;
   type: DocumentType;
   owner: string;

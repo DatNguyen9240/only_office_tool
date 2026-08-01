@@ -1,0 +1,20 @@
+query Workspace {
+  workspace {
+    dashboard {
+      metrics { documents folders sharedWithMe inReview versions }
+      storage {
+        source usedBytes totalBytes freeBytes workspaceBytes
+        documentsBytes versionsBytes percent measuredAt
+      }
+      activities { id actor action resource timestamp outcome }
+    }
+    recentDocuments {
+      nodes {
+        id version name type owner modifiedAt size status folderId shared starred
+        permission tags { id name color }
+        viewerCapabilities { canView canComment canEdit canShare canDelete }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}

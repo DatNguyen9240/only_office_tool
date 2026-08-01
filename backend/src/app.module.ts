@@ -12,7 +12,7 @@ import { AuditModule } from "./core/audit/audit.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { SearchModule } from "./modules/search/search.module";
 import { NotificationsModule } from "./core/notifications/notifications.module";
-import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
+import { ThrottlerModule } from "@nestjs/throttler";
 import { APP_GUARD } from "@nestjs/core";
 import { OperationsModule } from "./integrations/operations/operations.module";
 import { TagsModule } from "./modules/tags/tags.module";
@@ -20,6 +20,8 @@ import { TemplatesModule } from "./modules/templates/templates.module";
 import { AiModule } from "./integrations/ai/ai.module";
 import { WebhooksModule } from "./integrations/webhooks/webhooks.module";
 import { ProcessorModule } from "./integrations/processor/processor.module";
+import { GraphqlApiModule } from "./graphql/graphql-api.module";
+import { AppThrottlerGuard } from "./common/guards/app-throttler.guard";
 
 function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
   const requiredKeys = [
@@ -73,11 +75,12 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
     AiModule,
     WebhooksModule,
     ProcessorModule,
+    GraphqlApiModule,
   ],
   providers: [
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
     },
   ],
 })

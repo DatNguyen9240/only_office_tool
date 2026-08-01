@@ -1,0 +1,3 @@
+query Folders {
+  folders { id name parentId count }
+}

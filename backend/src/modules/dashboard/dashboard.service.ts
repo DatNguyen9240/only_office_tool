@@ -4,6 +4,7 @@ import { DocumentStatus } from "@prisma/client";
 import type { AuthenticatedUser } from "../../core/auth/auth.types";
 import { PrismaService } from "../../database/prisma/prisma.service";
 import { StorageService } from "../../integrations/storage/storage.service";
+import { DocumentAccessService } from "../documents/document-access.service";
 
 @Injectable()
 export class DashboardService {
@@ -12,6 +13,7 @@ export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly access: DocumentAccessService,
     config: ConfigService,
   ) {
     const configuredQuota = Number(config.get("STORAGE_QUOTA_BYTES"));
@@ -40,17 +42,14 @@ export class DashboardService {
         where: {
           ownerId: { not: user.id },
           deletedAt: null,
-          permissions: { some: { userId: user.id } },
+          ...this.access.accessWhere(user),
         },
       }),
       this.prisma.document.count({
         where: {
           deletedAt: null,
           status: DocumentStatus.REVIEW,
-          OR: [
-            { ownerId: user.id },
-            { permissions: { some: { userId: user.id } } },
-          ],
+          ...this.access.accessWhere(user),
         },
       }),
       this.prisma.documentVersion.count({

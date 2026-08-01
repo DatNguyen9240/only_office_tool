@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/api";
+import { graphqlRequest } from "@/lib/graphql";
+import foldersQuery from "@/graphql/folders.graphql?raw";
 
 export interface FolderItem {
   id: string;
@@ -8,10 +9,21 @@ export interface FolderItem {
   parentId?: string;
 }
 
-export function useFolders() {
+export function useFolders(enabled = true) {
   return useQuery({
     queryKey: ["folders"],
+    enabled,
     queryFn: ({ signal }): Promise<FolderItem[]> =>
-      apiRequest<FolderItem[]>("/folders", { signal }),
+      graphqlRequest<{ folders: Array<FolderItem & { parentId: string | null; count: number | null }> }>(
+        foldersQuery,
+        undefined,
+        { operationName: "Folders", signal },
+      ).then((response) =>
+        response.folders.map((folder) => ({
+          ...folder,
+          parentId: folder.parentId ?? undefined,
+          count: folder.count ?? 0,
+        })),
+      ),
   });
 }

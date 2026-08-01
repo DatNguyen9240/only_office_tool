@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString, Length, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, Length, Min } from "class-validator";
 
 export class UpdateDocumentDto {
   @IsOptional()
@@ -9,10 +9,6 @@ export class UpdateDocumentDto {
   @IsOptional()
   @IsString()
   folderId?: string | null;
-
-  @IsOptional()
-  @IsBoolean()
-  starred?: boolean;
 
   @IsOptional()
   @IsInt()

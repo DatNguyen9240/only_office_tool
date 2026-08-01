@@ -34,12 +34,14 @@ export class OperationsService implements OnModuleInit, OnApplicationShutdown {
   private timer?: NodeJS.Timeout;
 
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
-    private readonly scanner: MalwareScannerService,
+    @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(StorageService) private readonly storage: StorageService,
+    @Inject(MalwareScannerService) private readonly scanner: MalwareScannerService,
+    @Inject(ContentExtractionService)
     private readonly extraction: ContentExtractionService,
+    @Inject(ElasticsearchService)
     private readonly elasticsearch: ElasticsearchService,
-    private readonly config: ConfigService,
+    @Inject(ConfigService) private readonly config: ConfigService,
     @Inject(forwardRef(() => WebhooksService))
     private readonly webhooks: WebhooksService,
     @Inject(forwardRef(() => MailService))

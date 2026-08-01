@@ -12,7 +12,7 @@ import {
   type UploadFile,
 } from "antd";
 import type { UploadChangeParam } from "antd/es/upload";
-import { useFolders } from "@/hooks/useFolders";
+import { useFolders, type FolderItem } from "@/hooks/useFolders";
 import { translateApiError, useI18n } from "@/i18n";
 import { apiRequest } from "@/lib/api";
 
@@ -20,6 +20,7 @@ interface UploadModalProps {
   open: boolean;
   onClose: () => void;
   directory?: boolean;
+  folders?: FolderItem[];
 }
 
 interface UploadUrlResponse {
@@ -42,11 +43,17 @@ function contentTypeFor(file: File) {
   return supportedTypes[extension];
 }
 
-export function UploadModal({ open, onClose, directory = false }: UploadModalProps) {
+export function UploadModal({
+  open,
+  onClose,
+  directory = false,
+  folders,
+}: UploadModalProps) {
   const { message } = App.useApp();
   const { locale, t } = useI18n();
   const queryClient = useQueryClient();
-  const { data: folders = [] } = useFolders();
+  const { data: fetchedFolders = [] } = useFolders(!folders);
+  const availableFolders = folders ?? fetchedFolders;
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const requests = useRef(new Map<string, XMLHttpRequest>());
@@ -204,7 +211,7 @@ export function UploadModal({ open, onClose, directory = false }: UploadModalPro
           <Select
             options={[
               { label: t("filter.all"), value: "all" },
-              ...folders.map((folder) => ({
+              ...availableFolders.map((folder) => ({
                 label: folder.name,
                 value: folder.id,
               })),
@@ -218,23 +225,12 @@ export function UploadModal({ open, onClose, directory = false }: UploadModalPro
             beforeUpload={() => false}
             fileList={files}
             multiple
-            disabled={submitting}
-            onRemove={(file) => {
-              requests.current.get(file.uid)?.abort();
-              requests.current.delete(file.uid);
-              return true;
-            }}
-            onChange={({ fileList }: UploadChangeParam<UploadFile>) =>
-              setFiles(fileList)
-            }
+            onChange={(info: UploadChangeParam<UploadFile>) => setFiles(info.fileList)}
           >
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <Typography.Text strong>{t("upload.drop")}</Typography.Text>
-            <Typography.Paragraph type="secondary" style={{ margin: "6px 0 0" }}>
-              DOCX, XLSX, PPTX, PDF · 500 MB
-            </Typography.Paragraph>
+            <Typography.Text>Drag files here or click to browse.</Typography.Text>
           </Upload.Dragger>
         </Form.Item>
       </Form>

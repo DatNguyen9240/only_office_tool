@@ -1,0 +1,10 @@
+query Documents($scope: DocumentScope!, $first: Int!, $after: String) {
+  documents(scope: $scope, first: $first, after: $after) {
+    nodes {
+      id version name type owner modifiedAt size status folderId shared starred deletedAt
+      permission tags { id name color }
+      viewerCapabilities { canView canComment canEdit canShare canDelete }
+    }
+    pageInfo { hasNextPage endCursor }
+  }
+}

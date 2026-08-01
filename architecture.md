@@ -25,8 +25,8 @@ Nếu mục tiêu của bạn là xây dựng một nền tảng (Platform) ch�
                      │
  ──────────────────── API ────────────────────
                      │
-             NestJS Application
-                     │
+             NestJS Application ◄───────► Document Processor (C# / .NET 10)
+                     │                      (Word/Excel/PDF Engine)
  ┌───────────────────┼────────────────────┐
  │                   │                    │
  ▼                   ▼                    ▼
@@ -83,6 +83,16 @@ Quản lý vận hành và bảo mật:
 
 ## 3. Cấu Trúc Thư Mục Dự Án (Project Structure)
 
+### Microservice Xử Lý Tài Liệu (C# / .NET 10)
+
+```text
+document-processor/
+├── Controllers/        # API Endpoints (Merge, Excel, PDF)
+├── Models/             # Khai báo DTO requests
+├── Program.cs          # Điểm khởi chạy & Dependency Injection
+└── Dockerfile          # Cấu hình cài đặt môi trường và LibreOffice
+```
+
 ### Backend (NestJS)
 
 ```text
@@ -124,6 +134,7 @@ backend/src/
 └── integrations/       # Tích hợp dịch vụ bên ngoài
     ├── minio/          # S3 storage
     ├── onlyoffice/     # Trình soạn thảo văn bản trực tuyến
+    ├── processor/      # NestJS Client gọi dịch vụ C# xử lý tài liệu
     ├── rabbitmq/       # Hàng đợi tin nhắn (Queue)
     └── email/          # Dịch vụ gửi Email
 ```

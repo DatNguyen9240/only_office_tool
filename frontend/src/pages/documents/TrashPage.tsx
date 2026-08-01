@@ -12,7 +12,13 @@ export function TrashPage() {
   const { message } = App.useApp();
   const { locale } = useI18n();
   const queryClient = useQueryClient();
-  const { data = [], isLoading } = useDocuments("trash");
+  const {
+    data = [],
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useDocuments("trash");
 
   const run = async (
     document: DocumentItem,
@@ -79,6 +85,16 @@ export function TrashPage() {
           onRestore={(document) => void run(document, "restore")}
           onDelete={(document) => void run(document, "delete")}
         />
+        {hasNextPage && (
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 16 }}>
+            <Button
+              loading={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+            >
+              Load more
+            </Button>
+          </div>
+        )}
       </section>
     </PageContainer>
   );

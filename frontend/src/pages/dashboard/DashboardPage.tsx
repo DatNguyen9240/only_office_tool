@@ -20,8 +20,7 @@ import {
 } from "antd";
 import { useNavigate } from "react-router-dom";
 import { FileTable } from "@/components/file/Explorer/FileTable";
-import { useDashboard } from "@/hooks/useDashboard";
-import { useDocuments } from "@/hooks/useDocuments";
+import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuthStore } from "@/store/useAuthStore";
 
 const actionLabels: Record<string, string> = {
@@ -45,8 +44,9 @@ const actionLabels: Record<string, string> = {
 export function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const { data: documents = [], isLoading: documentsLoading } = useDocuments();
-  const { data: dashboard, isLoading: dashboardLoading } = useDashboard();
+  const { data: workspace, isLoading: dashboardLoading } = useWorkspace();
+  const documents = workspace?.recentDocuments.nodes ?? [];
+  const dashboard = workspace?.dashboard;
   const metrics = [
     {
       title: "Documents",
@@ -130,12 +130,12 @@ export function DashboardPage() {
           className="dashboard-recent"
           bodyStyle={{ padding: 0 }}
         >
-          <FileTable
-            compact
-            loading={documentsLoading}
-            documents={documents.slice(0, 5)}
-            onOpen={(document) => navigate(`/editor/${document.id}`)}
-          />
+            <FileTable
+              compact
+              loading={dashboardLoading}
+              documents={documents.slice(0, 5)}
+              onOpen={(document) => navigate(`/editor/${document.id}`)}
+            />
         </ProCard>
 
         <div className="dashboard-side">

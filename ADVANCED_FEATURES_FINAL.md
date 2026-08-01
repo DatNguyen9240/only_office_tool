@@ -7,6 +7,9 @@
 - Versioning, lịch sử, so sánh và khôi phục version.
 - Chỉnh sửa Office trên web với ONLYOFFICE.
 - Preview/thumbnail/metadata tài liệu.
+- Trộn dữ liệu vào biểu mẫu Word (Word merging) thông qua OpenXML mà không thay đổi cấu trúc định dạng.
+- Tự động xuất báo cáo Excel chứa biểu đồ động, công thức toán và định dạng phức tạp (sử dụng EPPlus).
+- Tự viết dịch vụ chuyển đổi định dạng tài liệu (Word/Excel sang PDF) sử dụng LibreOffice chạy headless trong Docker container của dịch vụ.
 - Trash, retention và xóa vĩnh viễn.
 
 ## Chia sẻ và cộng tác

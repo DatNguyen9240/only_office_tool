@@ -1,0 +1,8 @@
+query DocumentDetail($id: ID!) {
+  document(id: $id) {
+    id version name type owner modifiedAt size status folderId shared starred permission
+    tags { id name color }
+    viewerCapabilities { canView canComment canEdit canShare canDelete }
+    versions { id version versionLabel modifiedAt author size }
+  }
+}

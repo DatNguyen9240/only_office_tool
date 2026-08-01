@@ -11,24 +11,39 @@ import type { DocumentItem } from "@share";
 import { SharePermissionModal } from "@/components/file/Permissions/SharePermissionModal";
 import { VersionHistoryDrawer } from "@/components/file/Details/VersionHistoryDrawer";
 import { OnlyOfficeEditor } from "@/components/file/OnlyOffice/OnlyOfficeEditor";
-import { apiRequest } from "@/lib/api";
+import { graphqlRequest } from "@/lib/graphql";
+import documentDetailQuery from "@/graphql/document-detail.graphql?raw";
+
+interface DocumentDetailResponse {
+  document: DocumentItem & {
+    versions: Array<{
+      id: string;
+      version: number;
+      versionLabel: string;
+      modifiedAt: string;
+      author: string;
+      size: string;
+    }>;
+  };
+}
 
 export function EditorPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [shareOpen, setShareOpen] = useState(false);
   const [versionsOpen, setVersionsOpen] = useState(false);
-  const { data: document } = useQuery({
+  const { data } = useQuery({
     queryKey: ["documents", "detail", id],
     enabled: Boolean(id),
-    queryFn: () => apiRequest<DocumentItem>(`/documents/${id}`),
+    queryFn: ({ signal }) =>
+      graphqlRequest<DocumentDetailResponse, { id: string }>(
+        documentDetailQuery,
+        { id: id! },
+        { operationName: "DocumentDetail", signal },
+      ),
   });
-  const { data: versions = [] } = useQuery({
-    queryKey: ["documents", id, "versions"],
-    enabled: Boolean(id),
-    queryFn: () =>
-      apiRequest<Array<{ version: number }>>(`/documents/${id}/versions`),
-  });
+  const document = data?.document;
+  const versions = document?.versions ?? [];
 
   return (
     <main className="editor-page">

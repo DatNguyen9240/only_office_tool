@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { PermissionRole, Prisma } from "@prisma/client";
 import type { AuthenticatedUser } from "../../core/auth/auth.types";
 import { DocumentAuditListener } from "./listeners/document-audit.listener";
 import { DocumentAuditEvent } from "./events/document-audit.event";
@@ -61,6 +61,23 @@ export class DocumentAccessService {
 
   ownerWhere(user: AuthenticatedUser): Prisma.DocumentWhereInput {
     return user?.role === "ADMINISTRATOR" ? {} : { ownerId: user.id };
+  }
+
+  capabilities(
+    ownerId: string,
+    user: AuthenticatedUser,
+    permission?: PermissionRole | null,
+  ) {
+    const isOwner = ownerId === user.id || user.role === "ADMINISTRATOR";
+    const canEdit =
+      isOwner || permission === "EDITOR" || permission === "OWNER";
+    return {
+      canView: true,
+      canComment: canEdit || permission === "COMMENTER",
+      canEdit,
+      canShare: isOwner,
+      canDelete: isOwner,
+    };
   }
 
   recordAuditAsync(

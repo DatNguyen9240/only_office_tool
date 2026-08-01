@@ -7,5 +7,6 @@ import { FoldersService } from "./folders.service";
   imports: [PrismaModule],
   controllers: [FoldersController],
   providers: [FoldersService],
+  exports: [FoldersService],
 })
 export class FoldersModule {}

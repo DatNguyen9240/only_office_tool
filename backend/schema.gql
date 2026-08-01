@@ -1,0 +1,190 @@
+type PageInfoType {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+type TagType {
+  id: ID!
+  name: String!
+  color: String
+}
+
+type ViewerCapabilitiesType {
+  canView: Boolean!
+  canComment: Boolean!
+  canEdit: Boolean!
+  canShare: Boolean!
+  canDelete: Boolean!
+}
+
+type DocumentVersion {
+  id: ID!
+  version: Int!
+  versionLabel: String!
+  modifiedAt: String!
+  author: String!
+  size: String!
+}
+
+type Document {
+  id: ID!
+  version: Int!
+  name: String!
+  type: String!
+  owner: String!
+  modifiedAt: String!
+  size: String!
+  status: String!
+  folderId: String!
+  shared: Boolean!
+  starred: Boolean
+  deletedAt: String
+  permission: String
+  tags: [TagType!]!
+  viewerCapabilities: ViewerCapabilitiesType!
+  versions(first: Int! = 20): [DocumentVersion!]!
+}
+
+type DocumentConnectionType {
+  nodes: [Document!]!
+  pageInfo: PageInfoType!
+}
+
+type FolderType {
+  id: ID!
+  name: String!
+  parentId: String
+  count: Int
+}
+
+type DashboardMetricsType {
+  documents: Int!
+  folders: Int!
+  sharedWithMe: Int!
+  inReview: Int!
+  versions: Int!
+}
+
+type DashboardStorageType {
+  source: String!
+  usedBytes: Float!
+  totalBytes: Float!
+  freeBytes: Float!
+  workspaceBytes: Float!
+  documentsBytes: Float!
+  versionsBytes: Float!
+  percent: Int!
+  measuredAt: String
+}
+
+type ActivityType {
+  id: ID!
+  actor: String!
+  action: String!
+  resource: String!
+  timestamp: String!
+  outcome: String!
+}
+
+type DashboardType {
+  metrics: DashboardMetricsType!
+  storage: DashboardStorageType!
+  activities: [ActivityType!]!
+}
+
+type WorkspaceType {
+  dashboard: DashboardType!
+  folders: [FolderType!]!
+  recentDocuments: DocumentConnectionType!
+}
+
+type PersonType {
+  id: ID!
+  name: String!
+  email: String!
+  department: String
+}
+
+type SearchResultType {
+  documents: [Document!]!
+  folders: [FolderType!]!
+  people: [PersonType!]!
+}
+
+type MutationStatusType {
+  id: ID!
+  status: String!
+}
+
+type TrashStatusType {
+  status: String!
+  count: Int!
+}
+
+type PermissionEntryType {
+  id: ID!
+  name: String!
+  email: String!
+  groupId: String
+  kind: String!
+  role: String!
+  initials: String!
+}
+
+type Query {
+  workspace: WorkspaceType!
+  documents(scope: DocumentScope! = ALL, folderId: String, search: String, first: Int! = 20, after: String): DocumentConnectionType!
+  document(id: ID!): Document!
+  folders: [FolderType!]!
+  search(query: String!, first: Int! = 20): SearchResultType!
+  documentPermissions(id: ID!): [PermissionEntryType!]!
+}
+
+enum DocumentScope {
+  ALL
+  SHARED
+  TRASH
+  RECENT
+  FAVORITES
+}
+
+type Mutation {
+  updateDocument(id: ID!, input: UpdateDocumentInput!): Document!
+  restoreDocument(id: ID!): Document!
+  toggleDocumentStar(id: ID!): Document!
+  deleteDocument(id: ID!): MutationStatusType!
+  permanentlyDeleteDocument(id: ID!): MutationStatusType!
+  emptyTrash: TrashStatusType!
+  createFolder(input: CreateFolderInput!): FolderType!
+  updateFolder(id: ID!, input: UpdateFolderInput!): FolderType!
+  deleteFolder(id: ID!): MutationStatusType!
+  grantDocumentPermission(id: ID!, input: CreateDocumentPermissionInput!): PermissionEntryType!
+  updateDocumentPermission(id: ID!, permissionId: ID!, input: UpdateDocumentPermissionInput!): PermissionEntryType!
+  revokeDocumentPermission(id: ID!, permissionId: ID!): MutationStatusType!
+}
+
+input UpdateDocumentInput {
+  name: String
+  folderId: String
+  expectedVersion: Int
+}
+
+input CreateFolderInput {
+  name: String!
+  parentId: String
+}
+
+input UpdateFolderInput {
+  name: String
+  parentId: String
+}
+
+input CreateDocumentPermissionInput {
+  email: String
+  groupId: String
+  role: String!
+}
+
+input UpdateDocumentPermissionInput {
+  role: String!
+}

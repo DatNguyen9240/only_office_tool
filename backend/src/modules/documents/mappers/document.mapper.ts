@@ -66,6 +66,7 @@ export class DocumentMapper {
 
     return {
       id: document.id,
+      version: document.version,
       name: document.name,
       type: publicType(document.type),
       owner: document.owner.name,

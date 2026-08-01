@@ -16,6 +16,7 @@ import { useFolders, type FolderItem } from "@/hooks/useFolders";
 interface FolderTreeProps {
   selectedId: string;
   onSelect: (id: string) => void;
+  folders?: FolderItem[];
   onRename?: (folder: FolderItem) => void;
   onMove?: (folder: FolderItem) => void;
   onDelete?: (folder: FolderItem) => void;
@@ -25,16 +26,22 @@ interface FolderTreeProps {
 export function FolderTree({
   selectedId,
   onSelect,
+  folders,
   onRename,
   onMove,
   onDelete,
   onShare,
 }: FolderTreeProps) {
-  const { data: folders = [] } = useFolders();
+  const { data: fetchedFolders = [] } = useFolders(!folders);
+  const visibleFolders = folders ?? fetchedFolders;
 
   const treeData = useMemo<DataNode[]>(() => {
-    const allItem: FolderItem = { id: "all", name: "Tất cả tệp", count: folders.reduce((sum, f) => sum + (f.count || 0), 0) };
-    const list = [allItem, ...folders.filter((f) => f.id !== "all")];
+    const allItem: FolderItem = {
+      id: "all",
+      name: "Tất cả tệp",
+      count: visibleFolders.reduce((sum, item) => sum + (item.count || 0), 0),
+    };
+    const list = [allItem, ...visibleFolders.filter((item) => item.id !== "all")];
 
     const buildNode = (folder: FolderItem): DataNode => {
       const children = list
@@ -100,7 +107,7 @@ export function FolderTree({
       };
     };
     return list.filter((folder) => !folder.parentId).map(buildNode);
-  }, [folders, onDelete, onMove, onRename, onShare]);
+  }, [onDelete, onMove, onRename, onShare, visibleFolders]);
 
   return (
     <aside className="folder-tree-panel" aria-label="Folder navigation">
