@@ -8,8 +8,8 @@ services:
     environment:
       MINIO_PROMETHEUS_AUTH_TYPE: public
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "30389:9000"
+      - "9621:9001"
     volumes:
       - "${MINIO_DATA_PATH:-./.data/minio}:/data"
     restart: unless-stopped

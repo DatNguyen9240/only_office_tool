@@ -152,7 +152,6 @@ export function FileTable({
       title: "Name",
       dataIndex: "name",
       key: "name",
-      width: 250,
       sorter: (a: DocumentItem, b: DocumentItem) => a.name.localeCompare(b.name),
       render: (_: unknown, record: DocumentItem) => (
         <Space size={12}>
@@ -255,7 +254,7 @@ export function FileTable({
                 onSelectionChange?.(keys.map((key) => String(key))),
             }
       }
-      scroll={{ x: narrow ? 360 : 860 }}
+      scroll={narrow ? undefined : { x: 860 }}
       size="middle"
       onRow={(record: DocumentItem) => ({
         onClick: () => onSelect?.(record),
