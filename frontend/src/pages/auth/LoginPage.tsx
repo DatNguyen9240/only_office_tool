@@ -90,7 +90,7 @@ export function LoginPage() {
           src={loginArchive}
           alt=""
           decoding="async"
-          fetchPriority="high"
+          {...{ fetchpriority: "high" } as any}
         />
         <div className="login-brand-scrim" aria-hidden="true" />
         <div className="login-brand">
