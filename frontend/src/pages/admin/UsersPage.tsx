@@ -59,7 +59,7 @@ interface UserFilters {
 
 export function UsersPage() {
   const { message, modal } = App.useApp();
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord>();
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
@@ -210,13 +210,13 @@ export function UsersPage() {
       ),
     },
     {
-      title: "Department",
+      title: t("admin.department"),
       dataIndex: "department",
       width: 150,
-      renderText: (value) => value || "Not set",
+      renderText: (value) => value || t("admin.notSet"),
     },
     {
-      title: "Role",
+      title: t("admin.role"),
       dataIndex: "role",
       width: 110,
       valueType: "select",
@@ -226,7 +226,7 @@ export function UsersPage() {
       ),
     },
     {
-      title: "Status",
+      title: t("admin.status"),
       dataIndex: "status",
       width: 120,
       valueType: "select",
@@ -238,15 +238,15 @@ export function UsersPage() {
       ),
     },
     {
-      title: "Last active",
+      title: t("admin.lastActive"),
       dataIndex: "lastActiveAt",
       width: 170,
       search: false,
       renderText: (value) =>
-        value ? new Date(value).toLocaleString() : "Never",
+        value ? new Date(value).toLocaleString() : t("admin.never"),
     },
     {
-      title: "Actions",
+      title: locale === "vi" ? "Thao tác" : "Actions",
       valueType: "option",
       width: 72,
       render: (_, record) => [
@@ -258,8 +258,8 @@ export function UsersPage() {
   return (
     <PageContainer
       ghost
-      title="User management"
-      subTitle="Manage employee access, roles, and account status."
+      title={t("admin.usersTitle")}
+      subTitle={t("admin.usersSubtitle")}
       extra={[
         <Button
           key="create"
@@ -270,7 +270,7 @@ export function UsersPage() {
             setModalOpen(true);
           }}
         >
-          Create user
+          {t("admin.createUser")}
         </Button>,
       ]}
     >
@@ -278,7 +278,7 @@ export function UsersPage() {
         <ProCard>
           <Statistic
             loading={isLoading}
-            title="Total users"
+            title={t("admin.totalUsers")}
             value={users.length}
             prefix={<TeamOutlined />}
           />
@@ -286,14 +286,14 @@ export function UsersPage() {
         <ProCard>
           <Statistic
             loading={isLoading}
-            title="Active"
+            title={t("status.active")}
             value={users.filter((user) => user.status === "ACTIVE").length}
           />
         </ProCard>
         <ProCard>
           <Statistic
             loading={isLoading}
-            title="Suspended"
+            title={t("status.suspended")}
             value={users.filter((user) => user.status === "SUSPENDED").length}
           />
         </ProCard>

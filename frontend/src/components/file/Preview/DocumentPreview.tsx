@@ -8,8 +8,10 @@ import {
 } from "@ant-design/icons";
 import { Button, Descriptions, Empty, Tag, Typography } from "antd";
 import type { DocumentItem } from "@share";
-import { fileIcon, fileTypeLabels } from "@/components/file/Explorer/filePresentation";
+import { getFileTypeLabel, fileIcon } from "@/components/file/Explorer/filePresentation";
 import { CommentsPanel } from "@/components/file/Comments/CommentsPanel";
+import { formatDate } from "@/lib/date";
+import { useI18n } from "@/i18n";
 
 interface DocumentPreviewProps {
   document?: DocumentItem;
@@ -21,8 +23,6 @@ interface DocumentPreviewProps {
   onMetadata?: () => void;
 }
 
-import { formatDate } from "@/lib/date";
-
 export function DocumentPreview({
   document,
   onOpen,
@@ -32,12 +32,14 @@ export function DocumentPreview({
   onClose,
   onMetadata,
 }: DocumentPreviewProps) {
+  const { locale, t } = useI18n();
+
   if (!document) {
     return (
       <aside className="document-preview empty-preview" aria-label="Document preview">
         <Empty
           image={<FileSearchOutlined className="empty-preview-icon" />}
-          description="Select a document to preview its details"
+          description={locale === "vi" ? "Chọn một tài liệu để xem chi tiết" : "Select a document to preview its details"}
         />
       </aside>
     );
@@ -46,10 +48,10 @@ export function DocumentPreview({
   return (
     <aside className="document-preview" aria-label={`Preview of ${document.name}`}>
       <div className="preview-header">
-        <Typography.Text strong>Preview</Typography.Text>
+        <Typography.Text strong>{t("preview.title")}</Typography.Text>
         {onClose && (
           <Button type="text" size="small" onClick={onClose}>
-            Close
+            {locale === "vi" ? "Đóng" : "Close"}
           </Button>
         )}
       </div>
@@ -57,22 +59,22 @@ export function DocumentPreview({
         <div className="preview-file-mark">{fileIcon(document.type, 32)}</div>
         <Typography.Title level={5}>{document.name}</Typography.Title>
         <Typography.Text type="secondary">
-          {fileTypeLabels[document.type]} · {document.size}
+          {getFileTypeLabel(document.type, locale)} · {document.size}
         </Typography.Text>
         <Button
           icon={<ExpandOutlined />}
           className="preview-expand"
           onClick={onOpen}
         >
-          Full preview
+          {locale === "vi" ? "Xem toàn màn hình" : "Full preview"}
         </Button>
       </div>
       <div className="preview-actions">
         <Button type="primary" icon={<EditOutlined />} onClick={onOpen}>
-          Open
+          {t("common.open")}
         </Button>
         <Button icon={<ShareAltOutlined />} onClick={onShare}>
-          Share
+          {t("common.share")}
         </Button>
         <Button
           icon={<DownloadOutlined />}
@@ -81,19 +83,19 @@ export function DocumentPreview({
         />
       </div>
       <Descriptions column={1} size="small" className="preview-details">
-        <Descriptions.Item label="Owner">{document.owner}</Descriptions.Item>
-        <Descriptions.Item label="Modified">
+        <Descriptions.Item label={t("common.owner")}>{document.owner}</Descriptions.Item>
+        <Descriptions.Item label={t("common.modified")}>
           {formatDate(document.modifiedAt)}
         </Descriptions.Item>
-        <Descriptions.Item label="Access">
-          <Tag bordered={false}>{document.permission ?? "Private"}</Tag>
+        <Descriptions.Item label={t("files.access")}>
+          <Tag bordered={false}>{document.permission ?? t("files.private")}</Tag>
         </Descriptions.Item>
-        <Descriptions.Item label="Status">
-          {document.status === "review" ? "In review" : "Ready"}
+        <Descriptions.Item label={t("admin.status")}>
+          {document.status === "review" ? t("status.review") : t("status.ready")}
         </Descriptions.Item>
       </Descriptions>
       <Button block icon={<HistoryOutlined />} onClick={onVersions}>
-        View version history
+        {t("context.versions")}
       </Button>
       <Button
         block
@@ -101,7 +103,7 @@ export function DocumentPreview({
         onClick={onMetadata}
         style={{ marginTop: 8 }}
       >
-        Metadata and tags
+        {locale === "vi" ? "Thẻ và thông tin bổ sung" : "Metadata and tags"}
       </Button>
       <CommentsPanel
         documentId={document.id}

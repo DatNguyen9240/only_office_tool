@@ -11,7 +11,7 @@ import type { DocumentItem } from "@share";
 
 export function TrashPage() {
   const { message, modal } = App.useApp();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const {
@@ -37,8 +37,8 @@ export function TrashPage() {
       setSelectedIds((prev) => prev.filter((id) => id !== document.id));
       message.success(
         action === "restore"
-          ? `${document.name} restored`
-          : `${document.name} permanently deleted`,
+          ? t("trash.restored")
+          : t("trash.deleted"),
       );
     } catch (error) {
       const text = error instanceof Error ? error.message : "Operation failed";
@@ -54,7 +54,7 @@ export function TrashPage() {
         ),
       );
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
-      message.success(`${selectedIds.length} items restored`);
+      message.success(t("trash.batchRestored", { count: selectedIds.length }));
       setSelectedIds([]);
     } catch (error) {
       const text = error instanceof Error ? error.message : "Restore failed";
@@ -70,7 +70,7 @@ export function TrashPage() {
         ),
       );
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
-      message.success(`${selectedIds.length} items permanently deleted`);
+      message.success(t("trash.batchDeleted", { count: selectedIds.length }));
       setSelectedIds([]);
     } catch (error) {
       const text = error instanceof Error ? error.message : "Delete failed";
@@ -83,7 +83,7 @@ export function TrashPage() {
       await apiRequest("/documents?scope=trash", { method: "DELETE" });
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
       setSelectedIds([]);
-      message.success("Trash emptied");
+      message.success(t("trash.refreshed"));
     } catch (error) {
       const text = error instanceof Error ? error.message : "Empty trash failed";
       message.error(translateApiError(text, locale));
@@ -93,16 +93,16 @@ export function TrashPage() {
   return (
     <PageContainer
       ghost
-      title="Trash"
-      subTitle="Restore documents or remove them permanently."
+      title={t("page.trash.title")}
+      subTitle={t("page.trash.description")}
       extra={[
         <Popconfirm
           key="empty"
-          title="Empty trash?"
-          description="This permanently deletes every item in Trash."
+          title={t("trash.emptyConfirm")}
+          description={t("trash.emptyDescription")}
           onConfirm={emptyTrash}
         >
-          <Button danger icon={<DeleteOutlined />}>Empty trash</Button>
+          <Button danger icon={<DeleteOutlined />}>{t("trash.emptyButton")}</Button>
         </Popconfirm>,
       ]}
     >
@@ -111,19 +111,19 @@ export function TrashPage() {
         type="info"
         showIcon
         icon={<InfoCircleOutlined />}
-        message="Items in Trash are permanently deleted after 30 days."
+        message={t("trash.retentionAlert")}
       />
       <section className="trash-table-surface">
         {selectedIds.length > 0 && (
           <div className="document-selection-bar">
-            <Typography.Text strong>{selectedIds.length} selected</Typography.Text>
+            <Typography.Text strong>{t("selection.count", { count: selectedIds.length })}</Typography.Text>
             <Space wrap>
               <Button
                 size="small"
                 icon={<UndoOutlined />}
                 onClick={() => void batchRestore()}
               >
-                Restore
+                {t("common.restore")}
               </Button>
               <Button
                 danger
@@ -131,16 +131,16 @@ export function TrashPage() {
                 icon={<DeleteOutlined />}
                 onClick={() =>
                   modal.confirm({
-                    title: `Permanently delete ${selectedIds.length} documents?`,
-                    content: "This action cannot be undone.",
+                    title: t("trash.batchDeleteTitle", { count: selectedIds.length }),
+                    content: t("trash.batchDeleteDescription"),
                     onOk: batchPermanentDelete,
                   })
                 }
               >
-                Delete permanently
+                {t("context.deleteForever")}
               </Button>
               <Button type="text" size="small" onClick={() => setSelectedIds([])}>
-                Clear
+                {t("selection.clear")}
               </Button>
             </Space>
           </div>
@@ -160,7 +160,7 @@ export function TrashPage() {
               loading={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
             >
-              Load more
+              {locale === "vi" ? "Tải thêm" : "Load more"}
             </Button>
           </div>
         )}

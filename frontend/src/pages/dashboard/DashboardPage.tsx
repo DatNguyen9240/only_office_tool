@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { FileTable } from "@/components/file/Explorer/FileTable";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useI18n } from "@/i18n";
 
 const actionLabels: Record<string, string> = {
   LOGIN: "signed in",
@@ -44,54 +45,78 @@ const actionLabels: Record<string, string> = {
 export function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
+  const { locale, t } = useI18n();
   const { data: workspace, isLoading: dashboardLoading } = useWorkspace();
   const documents = workspace?.recentDocuments.nodes ?? [];
   const dashboard = workspace?.dashboard;
+
+  const actionLabelsVi: Record<string, string> = {
+    DOCUMENT_CREATED: "đã tạo",
+    DOCUMENT_UPDATED: "đã chỉnh sửa",
+    DOCUMENT_DOWNLOADED: "đã tải xuống",
+    DOCUMENT_DELETED: "đã chuyển vào thùng rác",
+    DOCUMENT_RESTORED: "đã khôi phục",
+    DOCUMENT_PERMANENTLY_DELETED: "đã xóa vĩnh viễn",
+    VERSION_RESTORED: "đã khôi phục phiên bản của",
+    PERMISSION_GRANTED: "đã chia sẻ",
+    PERMISSION_UPDATED: "đã thay đổi quyền truy cập của",
+    PERMISSION_REVOKED: "đã thu hồi quyền truy cập của",
+    USER_CREATED: "đã tạo người dùng",
+    USER_UPDATED: "đã cập nhật người dùng",
+    SESSIONS_REVOKED: "đã thu hồi phiên đăng nhập của",
+  };
+
+  const getActionLabel = (action: string) => {
+    if (locale === "vi") {
+      return actionLabelsVi[action] ?? action.toLowerCase();
+    }
+    return actionLabels[action] ?? action.toLowerCase();
+  };
+
   const metrics = [
     {
-      title: "Documents",
+      title: t("filter.documents"),
       value: dashboard?.metrics.documents ?? 0,
       icon: <FileTextOutlined />,
-      detail: `${dashboard?.metrics.folders ?? 0} folders`,
+      detail: locale === "vi" ? `${dashboard?.metrics.folders ?? 0} thư mục` : `${dashboard?.metrics.folders ?? 0} folders`,
     },
     {
-      title: "Shared with me",
+      title: t("nav.shared"),
       value: dashboard?.metrics.sharedWithMe ?? 0,
       icon: <ShareAltOutlined />,
-      detail: "Documents shared directly with you",
+      detail: locale === "vi" ? "Tài liệu chia sẻ trực tiếp với bạn" : "Documents shared directly with you",
     },
     {
-      title: "Waiting for review",
+      title: locale === "vi" ? "Chờ xem xét" : "Waiting for review",
       value: dashboard?.metrics.inReview ?? 0,
       icon: <ClockCircleOutlined />,
-      detail: "Accessible documents in review",
+      detail: locale === "vi" ? "Tài liệu đang trong quá trình xem xét" : "Accessible documents in review",
     },
     {
-      title: "Versions",
+      title: t("details.versions"),
       value: dashboard?.metrics.versions ?? 0,
       icon: <FolderOutlined />,
-      detail: "Stored versions in your documents",
+      detail: locale === "vi" ? "Phiên bản đã lưu trong tài liệu" : "Stored versions in your documents",
     },
   ];
-  const greeting =
-    new Date().getHours() < 12
-      ? "Good morning"
-      : new Date().getHours() < 18
-        ? "Good afternoon"
-        : "Good evening";
+
+  const hour = new Date().getHours();
+  const greeting = locale === "vi"
+    ? (hour < 12 ? "Chào buổi sáng" : hour < 18 ? "Chào buổi chiều" : "Chào buổi tối")
+    : (hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening");
 
   return (
     <PageContainer
       ghost
       title={`${greeting}, ${user?.name ?? "User"}`}
-      subTitle="Here is the current document activity across your workspace."
+      subTitle={locale === "vi" ? "Tổng quan hoạt động tài liệu gần đây trong không gian làm việc của bạn." : "Here is the current document activity across your workspace."}
       extra={[
         <Button
           key="folder"
           icon={<PlusOutlined />}
           onClick={() => navigate("/documents")}
         >
-          New folder
+          {t("folders.new")}
         </Button>,
         <Button
           key="upload"
@@ -99,7 +124,7 @@ export function DashboardPage() {
           icon={<UploadOutlined />}
           onClick={() => navigate("/documents")}
         >
-          Upload files
+          {t("upload.title")}
         </Button>,
       ]}
     >
@@ -121,10 +146,10 @@ export function DashboardPage() {
 
       <div className="dashboard-grid">
         <ProCard
-          title="Recent documents"
+          title={t("page.recent.collection")}
           extra={
             <Button type="link" onClick={() => navigate("/documents")}>
-              View all
+              {t("shared.viewAll")}
             </Button>
           }
           className="dashboard-recent"
@@ -139,11 +164,11 @@ export function DashboardPage() {
         </ProCard>
 
         <div className="dashboard-side">
-          <ProCard title="Recent activity" bodyStyle={{ padding: "0 20px" }}>
+          <ProCard title={t("activity.title")} bodyStyle={{ padding: "0 20px" }}>
             <List
               className="activity-list"
               loading={dashboardLoading}
-              locale={{ emptyText: <Empty description="No activity recorded yet" /> }}
+              locale={{ emptyText: <Empty description={locale === "vi" ? "Chưa có hoạt động nào được ghi nhận" : "No activity recorded yet"} /> }}
               dataSource={dashboard?.activities ?? []}
               renderItem={(item) => (
                 <List.Item>
@@ -152,7 +177,7 @@ export function DashboardPage() {
                     title={
                       <span>
                         <strong>{item.actor}</strong>{" "}
-                        {actionLabels[item.action] ?? item.action.toLowerCase()}
+                        {getActionLabel(item.action)}
                       </span>
                     }
                     description={
@@ -173,8 +198,8 @@ export function DashboardPage() {
           <ProCard
             title={
               dashboard?.storage.source === "configured_quota"
-                ? "Workspace storage quota"
-                : "MinIO storage capacity"
+                ? (locale === "vi" ? "Định mức lưu trữ không gian" : "Workspace storage quota")
+                : (locale === "vi" ? "Dung lượng lưu trữ MinIO" : "MinIO storage capacity")
             }
           >
             <div className="storage-summary">
@@ -184,10 +209,10 @@ export function DashboardPage() {
                 </span>
                 <div>
                   <Typography.Text strong>
-                    {formatBytes(dashboard?.storage.usedBytes ?? 0)} used
+                    {formatBytes(dashboard?.storage.usedBytes ?? 0)} {locale === "vi" ? "đã dùng" : "used"}
                   </Typography.Text>
                   <Typography.Text type="secondary">
-                    of {formatBytes(dashboard?.storage.totalBytes ?? 0)} total
+                    {locale === "vi" ? "trên tổng số" : "of"} {formatBytes(dashboard?.storage.totalBytes ?? 0)}
                   </Typography.Text>
                 </div>
               </Space>
@@ -197,17 +222,17 @@ export function DashboardPage() {
               />
               <div className="storage-legend">
                 <span>
-                  Free {formatBytes(dashboard?.storage.freeBytes ?? 0)}
+                  {locale === "vi" ? "Còn trống" : "Free"} {formatBytes(dashboard?.storage.freeBytes ?? 0)}
                 </span>
                 <span>
-                  This workspace{" "}
+                  {locale === "vi" ? "Không gian này" : "This workspace"}{" "}
                   {formatBytes(dashboard?.storage.workspaceBytes ?? 0)}
                 </span>
               </div>
               <Typography.Text type="secondary">
                 {dashboard?.storage.source === "configured_quota"
-                  ? "MinIO metrics unavailable; showing configured quota."
-                  : "Capacity reported by MinIO metrics."}
+                  ? (locale === "vi" ? "Chỉ số MinIO không khả dụng; hiển thị định mức được cấu hình." : "MinIO metrics unavailable; showing configured quota.")
+                  : (locale === "vi" ? "Dung lượng do MinIO báo cáo." : "Capacity reported by MinIO metrics.")}
               </Typography.Text>
             </div>
           </ProCard>

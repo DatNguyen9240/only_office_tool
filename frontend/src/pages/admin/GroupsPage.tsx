@@ -24,6 +24,8 @@ import {
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 
+import { useI18n } from "@/i18n";
+
 interface GroupMember {
   id: string;
   name: string;
@@ -42,6 +44,7 @@ interface GroupItem {
 
 export function GroupsPage() {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   const [memberGroup, setMemberGroup] = useState<GroupItem>();
   const [memberEmail, setMemberEmail] = useState("");
@@ -60,14 +63,14 @@ export function GroupsPage() {
     await refetch();
     form.resetFields();
     setCreateOpen(false);
-    message.success("Group created");
+    message.success(t("groups.created"));
   };
 
   return (
     <PageContainer
       ghost
-      title="Groups"
-      subTitle="Manage reusable teams for document and folder access."
+      title={t("groups.title")}
+      subTitle={t("groups.subtitle")}
       extra={[
         <Button
           key="create"
@@ -75,7 +78,7 @@ export function GroupsPage() {
           icon={<PlusOutlined />}
           onClick={() => setCreateOpen(true)}
         >
-          Create group
+          {t("groups.create")}
         </Button>,
       ]}
     >
@@ -92,8 +95,8 @@ export function GroupsPage() {
                 }
                 extra={
                   <Popconfirm
-                    title="Delete this group?"
-                    description="Existing group permissions will also be removed."
+                    title={t("groups.deleteConfirm")}
+                    description={t("groups.deleteDescription")}
                     onConfirm={async () => {
                       await apiRequest(`/admin/groups/${group.id}`, {
                         method: "DELETE",

@@ -30,6 +30,8 @@ import { useMemo, useState } from "react";
 import type { AuditRecord } from "@share";
 import { apiRequest } from "@/lib/api";
 
+import { useI18n } from "@/i18n";
+
 interface AuditFilters {
   query: string;
   action?: string;
@@ -38,6 +40,7 @@ interface AuditFilters {
 
 export function AuditPage() {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const screens = Grid.useBreakpoint();
   const [selected, setSelected] = useState<AuditRecord>();
   const [viewMode, setViewMode] = useState<"table" | "card">("table");
@@ -75,20 +78,20 @@ export function AuditPage() {
   const columns = useMemo<ProColumns<AuditRecord>[]>(
     () => [
       {
-        title: "Time",
+        title: t("audit.time"),
         dataIndex: "timestamp",
         valueType: "dateTime",
         width: 190,
         renderText: (value) => new Date(value).toLocaleString(),
       },
       {
-        title: "Actor",
+        title: t("audit.actor"),
         dataIndex: "actor",
         width: 180,
         copyable: true,
       },
       {
-        title: "Action",
+        title: t("audit.action"),
         dataIndex: "action",
         width: 150,
         valueType: "select",
@@ -103,38 +106,38 @@ export function AuditPage() {
         renderText: (value) => formatAction(value),
       },
       {
-        title: "Resource",
+        title: t("audit.resource"),
         dataIndex: "resource",
         width: 200,
         ellipsis: true,
       },
       {
-        title: "Outcome",
+        title: t("audit.outcome"),
         dataIndex: "outcome",
         width: 110,
         valueType: "select",
         fieldProps: {
           options: [
-            { label: "Success", value: "SUCCESS" },
-            { label: "Denied", value: "DENIED" },
-            { label: "Failed", value: "FAILED" },
+            { label: t("audit.success"), value: "SUCCESS" },
+            { label: t("audit.denied"), value: "DENIED" },
+            { label: t("audit.failed"), value: "FAILED" },
           ],
         },
         render: (_, record) => (
           <Tag color={record.outcome === "SUCCESS" ? "green" : "red"}>
-            {formatAction(record.outcome)}
+            {record.outcome === "SUCCESS" ? t("audit.success") : record.outcome === "DENIED" ? t("audit.denied") : t("audit.failed")}
           </Tag>
         ),
       },
       {
-        title: "Event ID",
+        title: t("audit.eventId"),
         dataIndex: "id",
         search: false,
         copyable: true,
         width: 120,
       },
       {
-        title: "Details",
+        title: t("audit.details"),
         valueType: "option",
         width: 72,
         render: (_, record) => [
@@ -148,12 +151,12 @@ export function AuditPage() {
         ],
       },
     ],
-    [auditRecords],
+    [auditRecords, t],
   );
 
   const exportCsv = () => {
     if (!auditRecords.length) {
-      message.info("There are no audit events to export");
+      message.info(t("audit.noEvents"));
       return;
     }
     const rows = [
@@ -189,14 +192,14 @@ export function AuditPage() {
     anchor.download = `meridian-audit-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
-    message.success(`Exported ${auditRecords.length} audit events`);
+    message.success(t("audit.exported", { count: auditRecords.length }));
   };
 
   return (
     <PageContainer
       ghost
-      title="Audit logs"
-      subTitle="Review security and document events across the organization."
+      title={t("audit.title")}
+      subTitle={t("audit.subtitle")}
       extra={[
         <Button
           key="export"

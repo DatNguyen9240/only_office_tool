@@ -33,9 +33,21 @@ export function fileIcon(type: DocumentType, size = 18) {
 }
 
 export const fileTypeLabels: Record<DocumentType, string> = {
+  docx: "Tài liệu",
+  xlsx: "Bảng tính",
+  pptx: "Bản trình bày",
+  pdf: "PDF",
+  folder: "Thư mục",
+};
+
+export const fileTypeLabelsEn: Record<DocumentType, string> = {
   docx: "Document",
   xlsx: "Spreadsheet",
   pptx: "Presentation",
   pdf: "PDF",
   folder: "Folder",
 };
+
+export function getFileTypeLabel(type: DocumentType, locale?: string): string {
+  return locale === "en" ? fileTypeLabelsEn[type] : fileTypeLabels[type];
+}

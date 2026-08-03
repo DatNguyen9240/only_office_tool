@@ -13,6 +13,8 @@ import { FileTable } from "@/components/file/Explorer/FileTable";
 import { graphqlRequest } from "@/lib/graphql";
 import searchQuery from "@/graphql/search.graphql?raw";
 
+import { useI18n } from "@/i18n";
+
 interface SearchResponse {
   documents: DocumentItem[];
   folders: Array<{ id: string; name: string; parentId: string | null }>;
@@ -31,6 +33,7 @@ interface SearchGraphqlResponse {
 
 export function SearchPage() {
   const navigate = useNavigate();
+  const { locale, t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get("q") ?? "";
   const [draft, setDraft] = useState(query);
@@ -77,15 +80,15 @@ export function SearchPage() {
   return (
     <PageContainer
       ghost
-      title="Search"
-      subTitle={query ? `Results for "${query}"` : "Find documents, folders, and people."}
+      title={t("search.title")}
+      subTitle={query ? t("search.resultsFor", { query }) : t("search.defaultSubtitle")}
     >
       <Input.Search
         allowClear
         size="large"
         prefix={<SearchOutlined />}
         value={draft}
-        placeholder="Search documents, folders, and people"
+        placeholder={t("search.placeholder")}
         onChange={(event) => setDraft(event.target.value)}
         onSearch={(value) => setSearchParams(value.trim() ? { q: value.trim() } : {})}
       />
@@ -94,7 +97,7 @@ export function SearchPage() {
           items={[
             {
               key: "documents",
-              label: `Documents (${data?.documents.length ?? 0})`,
+              label: `${t("filter.documents")} (${data?.documents.length ?? 0})`,
               children: (
                 <FileTable
                   compact
@@ -106,11 +109,11 @@ export function SearchPage() {
             },
             {
               key: "folders",
-              label: `Folders (${data?.folders.length ?? 0})`,
+              label: `${t("folders.title")} (${data?.folders.length ?? 0})`,
               children: (
                 <List
                   loading={isLoading}
-                  locale={{ emptyText: <Empty description="No folders found" /> }}
+                  locale={{ emptyText: <Empty description={t("search.noFolders")} /> }}
                   dataSource={data?.folders ?? []}
                   renderItem={(folder) => (
                     <List.Item
@@ -120,7 +123,7 @@ export function SearchPage() {
                       <List.Item.Meta
                         avatar={<Avatar icon={<FolderOutlined />} />}
                         title={folder.name}
-                        description="Folder"
+                        description={locale === "vi" ? "Thư mục" : "Folder"}
                       />
                     </List.Item>
                   )}
@@ -129,11 +132,11 @@ export function SearchPage() {
             },
             {
               key: "people",
-              label: `People (${data?.people.length ?? 0})`,
+              label: `${t("search.people")} (${data?.people.length ?? 0})`,
               children: (
                 <List
                   loading={isLoading}
-                  locale={{ emptyText: <Empty description="No people found" /> }}
+                  locale={{ emptyText: <Empty description={t("search.noPeople")} /> }}
                   dataSource={data?.people ?? []}
                   renderItem={(person) => (
                     <List.Item>
@@ -160,7 +163,7 @@ export function SearchPage() {
               loading={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
             >
-              Load more
+              {locale === "vi" ? "Tải thêm" : "Load more"}
             </Button>
           </div>
         )}

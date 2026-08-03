@@ -53,7 +53,7 @@ interface DocumentsPageProps {
 export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const screens = Grid.useBreakpoint();
   const [searchParams] = useSearchParams();
@@ -206,28 +206,28 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
   const showPreview = previewOpen && isDesktopPreview;
   const title =
     scope === "shared"
-      ? "Shared with me"
+      ? t("page.shared.title")
       : scope === "recent"
-        ? "Recent"
+        ? t("page.recent.title")
         : scope === "favorites"
-          ? "Favorites"
-          : "Documents";
+          ? t("page.favorites.title")
+          : t("page.drive.title");
   const collectionHeading =
     scope === "shared"
-      ? "All shared documents"
+      ? t("page.shared.collection")
       : scope === "recent"
-        ? "Recent documents"
+        ? t("page.recent.collection")
         : scope === "favorites"
-          ? "Starred documents"
-          : folders.find((folder) => folder.id === selectedFolderId)?.name;
+          ? t("page.favorites.collection")
+          : (folders.find((folder) => folder.id === selectedFolderId)?.name ?? t("page.drive.collection"));
   const subtitle =
     scope === "shared"
-      ? "Documents shared directly with you or your teams."
+      ? t("page.shared.description")
       : scope === "recent"
-        ? "Documents you have opened or changed most recently."
+        ? t("page.recent.description")
         : scope === "favorites"
-          ? "Documents you have starred for quick access."
-          : "Organize, edit, and govern your company documents.";
+          ? t("page.favorites.description")
+          : t("page.drive.description");
 
   const openDocument = (document: DocumentItem) => navigate(`/editor/${document.id}`);
   const removeDocument = async (document: DocumentItem) => {
@@ -391,7 +391,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
             items: [
               {
                 key: "files",
-                label: "Upload files",
+                label: t("upload.title"),
                 icon: <UploadOutlined />,
                 onClick: () => {
                   setUploadDirectory(false);
@@ -400,7 +400,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
               },
               {
                 key: "folder",
-                label: "Upload folder",
+                label: locale === "vi" ? "Tải thư mục lên" : "Upload folder",
                 icon: <FolderOutlined />,
                 onClick: () => {
                   setUploadDirectory(true);
@@ -411,7 +411,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           }}
         >
           <Button type="primary" icon={<UploadOutlined />}>
-            Upload <DownOutlined />
+            {t("header.upload")} <DownOutlined />
           </Button>
         </Dropdown>,
       ]}
@@ -419,7 +419,7 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
       <div className="documents-toolbar">
         {scope === "all" && !screens.lg && (
           <Button icon={<FolderOutlined />} onClick={() => setFolderDrawerOpen(true)}>
-            Folders
+            {t("folders.title")}
           </Button>
         )}
         <SearchBar value={query} onChange={setQuery} />
@@ -429,11 +429,11 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           value={typeFilter}
           suffixIcon={<FilterOutlined />}
           options={[
-            { value: "all", label: "All file types" },
-            { value: "docx", label: "Documents" },
-            { value: "xlsx", label: "Spreadsheets" },
-            { value: "pptx", label: "Presentations" },
-            { value: "pdf", label: "PDF files" },
+            { value: "all", label: t("filter.all") },
+            { value: "docx", label: t("filter.documents") },
+            { value: "xlsx", label: t("filter.spreadsheets") },
+            { value: "pptx", label: t("filter.presentations") },
+            { value: "pdf", label: t("filter.pdfs") },
           ]}
           onChange={setTypeFilter}
         />

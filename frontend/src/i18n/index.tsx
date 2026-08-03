@@ -252,6 +252,52 @@ const en = {
   "login.assurance": "Protected by enterprise identity and audit controls",
   "login.needAccess": "Need access?",
   "login.contactAdmin": "Contact your administrator",
+  "page.recent.collection": "Recent documents",
+  "page.shared.collection": "All shared documents",
+  "page.favorites.collection": "Starred documents",
+  "page.drive.collection": "All documents",
+  "status.ready": "Ready",
+  "status.review": "In review",
+  "status.locked": "Locked",
+  "status.deleted": "Deleted",
+  "preview.title": "Preview",
+  "search.title": "Search",
+  "search.placeholder": "Search documents, folders, and people",
+  "search.resultsFor": "Results for \"{{query}}\"",
+  "search.defaultSubtitle": "Find documents, folders, and people.",
+  "search.noFolders": "No folders found",
+  "search.noPeople": "No people found",
+  "search.people": "People",
+  "trash.emptyConfirm": "Empty trash?",
+  "trash.emptyDescription": "This permanently deletes every item in Trash.",
+  "trash.emptyButton": "Empty trash",
+  "trash.retentionAlert": "Items in Trash are permanently deleted after 30 days.",
+  "audit.title": "Audit logs",
+  "audit.subtitle": "Review security and document events across the organization.",
+  "audit.time": "Time",
+  "audit.actor": "Actor",
+  "audit.action": "Action",
+  "audit.resource": "Resource",
+  "audit.outcome": "Outcome",
+  "audit.eventId": "Event ID",
+  "audit.details": "Details",
+  "audit.success": "Success",
+  "audit.denied": "Denied",
+  "audit.failed": "Failed",
+  "audit.noEvents": "There are no audit events to export",
+  "audit.exported": "Exported {{count}} audit events",
+  "admin.usersTitle": "User management",
+  "admin.usersSubtitle": "Manage employee access, roles, and account status.",
+  "admin.totalUsers": "Total users",
+  "admin.lastActive": "Last active",
+  "admin.notSet": "Not set",
+  "admin.never": "Never",
+  "groups.title": "Groups",
+  "groups.subtitle": "Manage reusable teams for document and folder access.",
+  "groups.create": "Create group",
+  "groups.created": "Group created",
+  "groups.deleteConfirm": "Delete this group?",
+  "groups.deleteDescription": "Existing group permissions will also be removed.",
 } as const;
 
 export type TranslationKey = keyof typeof en;
@@ -492,9 +538,6 @@ const vi: Record<TranslationKey, string> = {
   "login.trustEditing": "Chỉnh sửa an toàn qua ONLYOFFICE",
   "login.protected": "Không gian doanh nghiệp được bảo vệ",
   "login.secureAccess": "Truy cập an toàn",
-  "login.welcome": "Chào mừng bạn trở lại",
-  "login.subtitle": "Dùng tài khoản công ty để tiếp tục vào Meridian.",
-  "login.email": "Email công việc",
   "login.emailRequired": "Hãy nhập email công việc",
   "login.emailInvalid": "Hãy nhập địa chỉ email hợp lệ",
   "login.emailPlaceholder": "ten@congty.com",
@@ -503,6 +546,9 @@ const vi: Record<TranslationKey, string> = {
   "login.passwordPlaceholder": "Nhập mật khẩu",
   "login.remember": "Duy trì đăng nhập",
   "login.forgot": "Quên mật khẩu?",
+  "login.welcome": "Chào mừng bạn trở lại",
+  "login.subtitle": "Dùng tài khoản công ty để tiếp tục vào Meridian.",
+  "login.email": "Email công việc",
   "login.signIn": "Đăng nhập",
   "login.or": "hoặc",
   "login.sso": "Tiếp tục với SSO doanh nghiệp",
@@ -510,6 +556,52 @@ const vi: Record<TranslationKey, string> = {
   "login.assurance": "Được bảo vệ bởi định danh doanh nghiệp và kiểm soát kiểm toán",
   "login.needAccess": "Bạn cần quyền truy cập?",
   "login.contactAdmin": "Liên hệ quản trị viên",
+  "page.recent.collection": "Tài liệu gần đây",
+  "page.shared.collection": "Tất cả tài liệu được chia sẻ",
+  "page.favorites.collection": "Tài liệu đã đánh dấu sao",
+  "page.drive.collection": "Tất cả tài liệu",
+  "status.ready": "Sẵn sàng",
+  "status.review": "Đang xem xét",
+  "status.locked": "Đã khóa",
+  "status.deleted": "Đã xóa",
+  "preview.title": "Xem trước",
+  "search.title": "Tìm kiếm",
+  "search.placeholder": "Tìm tệp, thư mục và người dùng",
+  "search.resultsFor": 'Kết quả cho "{{query}}"',
+  "search.defaultSubtitle": "Tìm tệp, thư mục và người dùng.",
+  "search.noFolders": "Không tìm thấy thư mục nào",
+  "search.noPeople": "Không tìm thấy người dùng nào",
+  "search.people": "Người dùng",
+  "trash.emptyConfirm": "Xóa sạch thùng rác?",
+  "trash.emptyDescription": "Thao tác này sẽ xóa vĩnh viễn tất cả tệp trong Thùng rác.",
+  "trash.emptyButton": "Xóa sạch thùng rác",
+  "trash.retentionAlert": "Các mục trong Thùng rác sẽ bị xóa vĩnh viễn sau 30 ngày.",
+  "audit.title": "Nhật ký kiểm toán",
+  "audit.subtitle": "Xem lại các sự kiện an ninh và tài liệu trong toàn bộ tổ chức.",
+  "audit.time": "Thời gian",
+  "audit.actor": "Người thực hiện",
+  "audit.action": "Hành động",
+  "audit.resource": "Đối tượng",
+  "audit.outcome": "Kết quả",
+  "audit.eventId": "Mã sự kiện",
+  "audit.details": "Chi tiết",
+  "audit.success": "Thành công",
+  "audit.denied": "Từ chối",
+  "audit.failed": "Thất bại",
+  "audit.noEvents": "Không có sự kiện kiểm toán nào để xuất",
+  "audit.exported": "Đã xuất {{count}} sự kiện kiểm toán",
+  "admin.usersTitle": "Quản lý người dùng",
+  "admin.usersSubtitle": "Quản lý quyền truy cập, vai trò và trạng thái tài khoản của nhân viên.",
+  "admin.totalUsers": "Tổng người dùng",
+  "admin.lastActive": "Hoạt động lần cuối",
+  "admin.notSet": "Chưa thiết lập",
+  "admin.never": "Chưa từng",
+  "groups.title": "Quản lý nhóm",
+  "groups.subtitle": "Quản lý các nhóm người dùng để phân quyền tài liệu và thư mục.",
+  "groups.create": "Tạo nhóm",
+  "groups.created": "Đã tạo nhóm",
+  "groups.deleteConfirm": "Xóa nhóm này?",
+  "groups.deleteDescription": "Các quyền của nhóm này cũng sẽ bị thu hồi.",
 };
 
 interface I18nContextValue {
@@ -543,6 +635,10 @@ export function I18nProvider({
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 
+export function useI18n() {
+  return useContext(I18nContext);
+}
+
 const errorTranslationsVi: Record<string, string> = {
   "Email or password is incorrect": "Email hoặc mật khẩu không chính xác.",
   "password must be longer than or equal to 12 characters": "Mật khẩu phải có ít nhất 12 ký tự.",
@@ -571,9 +667,5 @@ export function translateApiError(errorMsg: string, locale: AppLocale): string {
       return errorTranslationsVi[trimmed] || trimmed;
     })
     .join(", ");
-}
-
-export function useI18n() {
-  return useContext(I18nContext);
 }
 

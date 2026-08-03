@@ -17,8 +17,9 @@ import { useState } from "react";
 import type { Key } from "react";
 import { FileTableSkeleton } from "@/components/common/LoadingSkeletons";
 import type { DocumentItem } from "@share";
-import { fileIcon, fileTypeLabels } from "@/components/file/Explorer/filePresentation";
+import { getFileTypeLabel, fileIcon } from "@/components/file/Explorer/filePresentation";
 import { formatDate, formatRelativeDate } from "@/lib/date";
+import { useI18n } from "@/i18n";
 
 interface FileTableProps {
   documents: DocumentItem[];
@@ -42,10 +43,10 @@ interface FileTableProps {
 }
 
 const statusMap = {
-  ready: { label: "Ready", color: "green" },
-  review: { label: "In review", color: "gold" },
-  locked: { label: "Locked", color: "default" },
-  deleted: { label: "Deleted", color: "red" },
+  ready: { labelEn: "Ready", labelVi: "Sẵn sàng", color: "green" },
+  review: { labelEn: "In review", labelVi: "Đang xem xét", color: "gold" },
+  locked: { labelEn: "Locked", labelVi: "Đã khóa", color: "default" },
+  deleted: { labelEn: "Deleted", labelVi: "Đã xóa", color: "red" },
 } as const;
 
 export function FileTable({
@@ -68,6 +69,7 @@ export function FileTable({
   selectedIds = [],
   onSelectionChange,
 }: FileTableProps) {
+  const { locale, t } = useI18n();
   const [internalSelectedIds, setInternalSelectedIds] = useState<Key[]>([]);
 
   if (loading) {
@@ -93,7 +95,7 @@ export function FileTable({
           {
             key: "restore",
             icon: <UndoOutlined />,
-            label: "Restore",
+            label: t("common.restore"),
             onClick: () => onRestore?.(record),
           },
           { type: "divider" },
@@ -101,7 +103,7 @@ export function FileTable({
             key: "delete",
             danger: true,
             icon: <DeleteOutlined />,
-            label: "Delete permanently",
+            label: t("context.deleteForever"),
             onClick: () => onDelete?.(record),
           },
         ]
@@ -109,64 +111,64 @@ export function FileTable({
           {
             key: "open",
             icon: <EditOutlined />,
-            label: "Open",
+            label: t("common.open"),
             onClick: () => onOpen?.(record),
           },
           {
             key: "preview",
             icon: <EyeOutlined />,
-            label: "Preview",
+            label: t("preview.title"),
             onClick: () => onSelect?.(record),
           },
           {
             key: "rename",
             icon: <EditOutlined />,
-            label: "Rename",
+            label: t("common.rename"),
             onClick: () => onRename?.(record),
           },
           {
             key: "move",
             icon: <FolderOpenOutlined />,
-            label: "Move",
+            label: t("common.move"),
             onClick: () => onMove?.(record),
           },
           {
             key: "star",
             icon: <StarOutlined />,
-            label: record.starred ? "Remove from favorites" : "Add to favorites",
+            label: record.starred ? t("files.removeFavorite") : t("files.addFavorite"),
             onClick: () => onStar?.(record),
           },
           {
             key: "share",
             icon: <ShareAltOutlined />,
-            label: "Manage access",
+            label: t("share.title"),
             onClick: () => onShare?.(record),
           },
           {
             key: "versions",
             icon: <HistoryOutlined />,
-            label: "Version history",
+            label: t("context.versions"),
             onClick: () => onVersions?.(record),
           },
           { type: "divider" },
           {
             key: "download",
             icon: <DownloadOutlined />,
-            label: "Download",
+            label: t("common.download"),
             onClick: () => onDownload?.(record),
           },
           {
             key: "delete",
             danger: true,
             icon: <DeleteOutlined />,
-            label: "Move to trash",
+            label: t("context.moveTrash"),
             onClick: () => onDelete?.(record),
           },
         ];
 
   const columns: TableProps<DocumentItem>["columns"] = [
     {
-      title: "Name",
+      title: t("files.name"),
       dataIndex: "name",
       key: "name",
       sorter: (a: DocumentItem, b: DocumentItem) => a.name.localeCompare(b.name),
@@ -183,7 +185,7 @@ export function FileTable({
                 type="secondary"
                 className="mobile-file-meta"
               >
-                {fileTypeLabels[record.type]} · {formatRelativeDate(record.modifiedAt)}
+                {getFileTypeLabel(record.type, locale)} · {formatRelativeDate(record.modifiedAt)}
               </Typography.Text>
             )}
           </span>
@@ -191,7 +193,7 @@ export function FileTable({
       ),
     },
     {
-      title: "Owner",
+      title: t("common.owner"),
       dataIndex: "owner",
       key: "owner",
       responsive: ["lg"],
@@ -199,7 +201,7 @@ export function FileTable({
       ellipsis: true,
     },
     {
-      title: trash ? "Deleted" : "Modified",
+      title: trash ? t("files.deleted") : t("common.modified"),
       dataIndex: trash ? "deletedAt" : "modifiedAt",
       key: "modifiedAt",
       width: 140,
@@ -221,7 +223,7 @@ export function FileTable({
       ),
     },
     {
-      title: "Size",
+      title: t("common.size"),
       dataIndex: "size",
       key: "size",
       width: 88,
@@ -229,16 +231,20 @@ export function FileTable({
       align: "right",
     },
     {
-      title: "Status",
+      title: t("admin.status"),
       dataIndex: "status",
       key: "status",
       width: 108,
       responsive: ["lg"],
-      render: (status: DocumentItem["status"]) => (
-        <Tag color={statusMap[status].color} bordered={false} style={{ margin: 0 }}>
-          {status === "locked" && <LockOutlined />} {statusMap[status].label}
-        </Tag>
-      ),
+      render: (status: DocumentItem["status"]) => {
+        const item = statusMap[status];
+        const label = locale === "vi" ? item.labelVi : item.labelEn;
+        return (
+          <Tag color={item.color} bordered={false} style={{ margin: 0 }}>
+            {status === "locked" && <LockOutlined />} {label}
+          </Tag>
+        );
+      },
     },
     {
       title: <span className="sr-only">Actions</span>,
