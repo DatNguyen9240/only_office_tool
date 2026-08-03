@@ -243,24 +243,24 @@ export function SharePermissionModal({
         initialValues={{ role: "Viewer", recipientType: "user" }}
         className="share-form"
       >
-        <Form.Item label="Recipient type" name="recipientType">
+        <Form.Item label={locale === "vi" ? "Loại đối tượng" : "Recipient type"} name="recipientType">
           <Select
             options={[
-              { value: "user", label: "Person" },
-              { value: "group", label: "Group" },
+              { value: "user", label: locale === "vi" ? "Cá nhân" : "Person" },
+              { value: "group", label: locale === "vi" ? "Nhóm" : "Group" },
             ]}
           />
         </Form.Item>
         {recipientType === "group" ? (
           <Form.Item
-            label="Group"
+            label={locale === "vi" ? "Chọn nhóm" : "Group"}
             name="groupId"
-            rules={[{ required: true, message: "Choose a group" }]}
+            rules={[{ required: true, message: locale === "vi" ? "Hãy chọn nhóm" : "Choose a group" }]}
           >
             <Select
               showSearch
               optionFilterProp="label"
-              placeholder="Choose a group"
+              placeholder={locale === "vi" ? "Chọn nhóm" : "Choose a group"}
               options={groups.map((group) => ({
                 value: group.id,
                 label: `${group.name} (${group.memberCount})`,
