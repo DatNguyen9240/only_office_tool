@@ -97,7 +97,7 @@ export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
   }, [documentId]);
 
   return (
-    <div style={{ width: "100%", height: "100%", minHeight: 650, position: "relative" }}>
+    <div style={{ width: "100%", height: "100%", position: "relative", overflow: "hidden" }}>
       {error ? (
         <Alert
           showIcon
@@ -125,8 +125,32 @@ export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
       <div
         ref={containerRef}
         hidden={loading || Boolean(error)}
-        style={{ width: "100%", height: "100%", minHeight: 650 }}
+        style={{ width: "100%", height: "100%" }}
       />
+      {!loading && !error && watermarkText && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            pointerEvents: "none",
+            zIndex: 9999,
+            backgroundImage: `url("data:image/svg+xml;utf8,${encodeURIComponent(
+              `<svg xmlns="http://www.w3.org/2000/svg" width="350" height="200">
+                <text x="50%" y="50%" fill="black" font-size="13" font-family="sans-serif" font-weight="bold" opacity="${
+                  watermarkText.includes("CONFIDENTIAL") ? 0.14 : 0.05
+                }" transform="rotate(-30 175 100)" text-anchor="middle">
+                  ${watermarkText}
+                </text>
+              </svg>`,
+            )}")`,
+            backgroundRepeat: "repeat",
+          }}
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 }

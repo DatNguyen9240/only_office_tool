@@ -1810,9 +1810,11 @@ html[data-theme="dark"] .login-assurance > .anticon {
 /* Editor */
 .editor-page {
   display: flex;
-  min-height: 100dvh;
+  height: 100vh;
+  max-height: 100vh;
   flex-direction: column;
   background: #e9edf2;
+  overflow: hidden;
 }
 
 .editor-header {
@@ -1822,6 +1824,7 @@ html[data-theme="dark"] .login-assurance > .anticon {
   align-items: center;
   justify-content: space-between;
   min-height: 64px;
+  max-height: 64px;
   padding: 8px 16px;
   border-bottom: 1px solid #dce2e9;
   background: #fff;
@@ -1851,13 +1854,15 @@ html[data-theme="dark"] .login-assurance > .anticon {
 }
 
 .editor-stage {
-  min-height: 0;
   flex: 1;
+  min-height: 0;
+  height: calc(100vh - 64px);
+  overflow: hidden;
 }
 
 .onlyoffice-editor-host {
   width: 100%;
-  height: calc(100dvh - 64px);
+  height: 100%;
 }
 
 .editor-fallback {
