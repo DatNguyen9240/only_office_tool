@@ -10,7 +10,8 @@ import {
 } from "@ant-design/icons";
 import { Button, Dropdown, Space, Typography } from "antd";
 import type { DocumentItem } from "@share";
-import { fileIcon, fileTypeLabels } from "@/components/file/Explorer/filePresentation";
+import { fileIcon, getFileTypeLabel } from "@/components/file/Explorer/filePresentation";
+import { useI18n } from "@/i18n";
 
 interface FileCardProps {
   document: DocumentItem;
@@ -39,6 +40,8 @@ export function FileCard({
   onMove,
   onStar,
 }: FileCardProps) {
+  const { locale, t } = useI18n();
+
   return (
     <article
       className={`file-card${selected ? " selected" : ""}`}
@@ -54,50 +57,50 @@ export function FileCard({
         <Dropdown
           menu={{
             items: [
-              { key: "open", label: "Open", onClick: onOpen },
+              { key: "open", label: t("common.open") || "Mở", onClick: onOpen },
               {
                 key: "rename",
                 icon: <EditOutlined />,
-                label: "Rename",
+                label: t("common.rename"),
                 onClick: onRename,
               },
               {
                 key: "move",
                 icon: <FolderOpenOutlined />,
-                label: "Move",
+                label: t("common.move"),
                 onClick: onMove,
               },
               {
                 key: "star",
                 icon: <StarOutlined />,
                 label: document.starred
-                  ? "Remove from favorites"
-                  : "Add to favorites",
+                  ? t("files.removeFavorite")
+                  : t("files.addFavorite"),
                 onClick: onStar,
               },
               {
                 key: "share",
                 icon: <ShareAltOutlined />,
-                label: "Manage access",
+                label: t("share.title"),
                 onClick: onShare,
               },
               {
                 key: "versions",
                 icon: <HistoryOutlined />,
-                label: "Version history",
+                label: t("context.versions"),
                 onClick: onVersions,
               },
               {
                 key: "download",
                 icon: <DownloadOutlined />,
-                label: "Download",
+                label: t("common.download"),
                 onClick: onDownload,
               },
               {
                 key: "delete",
                 danger: true,
                 icon: <DeleteOutlined />,
-                label: "Move to trash",
+                label: t("context.moveTrash"),
                 onClick: onDelete,
               },
             ],
@@ -117,7 +120,7 @@ export function FileCard({
       </Typography.Text>
       <Space direction="vertical" size={2}>
         <Typography.Text type="secondary">
-          {fileTypeLabels[document.type]}
+          {getFileTypeLabel(document.type, locale)}
         </Typography.Text>
         <Typography.Text type="secondary">{document.modifiedAt}</Typography.Text>
       </Space>

@@ -119,36 +119,38 @@ export function GroupsPage() {
                     icon={<UserAddOutlined />}
                     onClick={() => setMemberGroup(group)}
                   >
-                    Manage members
+                    {locale === "vi" ? "Quản lý thành viên" : "Manage members"}
                   </Button>,
                 ]}
               >
                 <Typography.Paragraph type="secondary">
-                  {group.description || "No description"}
+                  {group.description || (locale === "vi" ? "Chưa có mô tả" : "No description")}
                 </Typography.Paragraph>
-                <Typography.Text>{group.memberCount} members</Typography.Text>
+                <Typography.Text>
+                  {group.memberCount} {locale === "vi" ? "thành viên" : "members"}
+                </Typography.Text>
               </Card>
             </Col>
           ))}
         </Row>
       </ProCard>
       <Modal
-        title="Create group"
+        title={locale === "vi" ? "Tạo nhóm mới" : "Create group"}
         open={createOpen}
         onCancel={() => setCreateOpen(false)}
         onOk={() => void createGroup()}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label={locale === "vi" ? "Tên nhóm" : "Name"} rules={[{ required: true }]}>
             <Input maxLength={120} />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label={locale === "vi" ? "Mô tả" : "Description"}>
             <Input.TextArea maxLength={500} />
           </Form.Item>
         </Form>
       </Modal>
       <Modal
-        title={memberGroup ? `${memberGroup.name} members` : "Members"}
+        title={memberGroup ? (locale === "vi" ? `Thành viên nhóm ${memberGroup.name}` : `${memberGroup.name} members`) : (locale === "vi" ? "Thành viên" : "Members")}
         open={Boolean(memberGroup)}
         onCancel={() => {
           setMemberGroup(undefined);
@@ -178,18 +180,18 @@ export function GroupsPage() {
               setMemberEmail("");
             }}
           >
-            Add
+            {locale === "vi" ? "Thêm" : "Add"}
           </Button>
         </Space.Compact>
         <List
           dataSource={memberGroup?.members ?? []}
-          locale={{ emptyText: "No members" }}
+          locale={{ emptyText: locale === "vi" ? "Chưa có thành viên" : "No members" }}
           renderItem={(member) => (
             <List.Item
               actions={[
                 <Popconfirm
                   key="remove"
-                  title="Remove this member?"
+                  title={locale === "vi" ? "Xóa thành viên này khỏi nhóm?" : "Remove this member?"}
                   onConfirm={async () => {
                     if (!memberGroup) return;
                     await apiRequest(
@@ -202,7 +204,7 @@ export function GroupsPage() {
                     );
                   }}
                 >
-                  <Button danger type="text">Remove</Button>
+                  <Button danger type="text">{locale === "vi" ? "Xóa" : "Remove"}</Button>
                 </Popconfirm>,
               ]}
             >

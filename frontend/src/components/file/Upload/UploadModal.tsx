@@ -190,7 +190,7 @@ export function UploadModal({
     <Modal
       destroyOnHidden
       open={open}
-      title={directory ? "Upload folder" : t("upload.title")}
+      title={directory ? (locale === "vi" ? "Tải lên thư mục" : "Upload folder") : t("upload.title")}
       width={600}
       onCancel={cancel}
       footer={[
@@ -230,7 +230,9 @@ export function UploadModal({
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
-            <Typography.Text>Drag files here or click to browse.</Typography.Text>
+            <Typography.Text>
+              {locale === "vi" ? "Kéo thả tệp vào đây hoặc nhấp để chọn tệp." : "Drag files here or click to browse."}
+            </Typography.Text>
           </Upload.Dragger>
         </Form.Item>
       </Form>
