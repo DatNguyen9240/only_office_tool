@@ -131,7 +131,7 @@ export function VersionHistoryDrawer({
             maxCount={2}
             value={compareSelection}
             onChange={setCompareSelection}
-            placeholder="Choose 2 versions to compare"
+            placeholder={locale === "vi" ? "Chọn 2 phiên bản để so sánh" : "Choose 2 versions to compare"}
             style={{ flex: 1 }}
             options={versionList.map((version) => ({
               value: version.version,
@@ -150,7 +150,7 @@ export function VersionHistoryDrawer({
               );
             }}
           >
-            Compare
+            {locale === "vi" ? "So sánh" : "Compare"}
           </Button>
         </Space.Compact>
       )}
@@ -192,7 +192,7 @@ export function VersionHistoryDrawer({
                     icon={<DownloadOutlined />}
                     onClick={() => void downloadVersion(item.version)}
                   >
-                    Download
+                    {locale === "vi" ? "Tải xuống" : "Download"}
                   </Button>
                 </Space>
               </div>
@@ -202,7 +202,7 @@ export function VersionHistoryDrawer({
       />
       <Modal
         open={Boolean(comparison)}
-        title="Version comparison"
+        title={locale === "vi" ? "So sánh phiên bản" : "Version comparison"}
         footer={null}
         onCancel={() => setComparison(undefined)}
         width={760}
@@ -214,7 +214,7 @@ export function VersionHistoryDrawer({
         ) : (
           <>
             <Typography.Paragraph>
-              {comparison.changedLines} changed lines
+              {comparison.changedLines} {locale === "vi" ? "dòng đã thay đổi" : "changed lines"}
             </Typography.Paragraph>
             <div className="version-diff">
               {comparison.changes?.slice(0, 200).map((change) => (

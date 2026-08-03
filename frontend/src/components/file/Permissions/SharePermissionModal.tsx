@@ -192,7 +192,7 @@ export function SharePermissionModal({
         },
       );
       await navigator.clipboard.writeText(link.url);
-      message.success("View-only link copied");
+      message.success(locale === "vi" ? "Đã sao chép liên kết xem" : "View-only link copied");
     } catch (error) {
       const text = error instanceof Error ? error.message : "Failed to create share link";
       message.error(translateApiError(text, locale));

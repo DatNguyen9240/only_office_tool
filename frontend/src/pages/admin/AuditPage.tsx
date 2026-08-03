@@ -245,7 +245,7 @@ export function AuditPage() {
           <Input
             allowClear
             value={filters.query}
-            placeholder="Search actor, resource, or event ID"
+            placeholder={locale === "vi" ? "Tìm người thực hiện, đối tượng hoặc mã sự kiện" : "Search actor, resource, or event ID"}
             onChange={(event) => {
               setFilters((current) => ({ ...current, query: event.target.value }));
               setPage(1);
@@ -254,7 +254,7 @@ export function AuditPage() {
           <Select
             allowClear
             value={filters.action}
-            placeholder="Action"
+            placeholder={locale === "vi" ? "Hành động" : "Action"}
             options={[...new Set(auditRecords.map((record) => record.action))].map(
               (value) => ({ label: formatAction(value), value }),
             )}
@@ -266,11 +266,11 @@ export function AuditPage() {
           <Select
             allowClear
             value={filters.outcome}
-            placeholder="Outcome"
+            placeholder={locale === "vi" ? "Kết quả" : "Outcome"}
             options={[
-              { label: "Success", value: "SUCCESS" },
-              { label: "Denied", value: "DENIED" },
-              { label: "Failed", value: "FAILED" },
+              { label: locale === "vi" ? "Thành công" : "Success", value: "SUCCESS" },
+              { label: locale === "vi" ? "Từ chối" : "Denied", value: "DENIED" },
+              { label: locale === "vi" ? "Thất bại" : "Failed", value: "FAILED" },
             ]}
             onChange={(value) => {
               setFilters((current) => ({ ...current, outcome: value }));

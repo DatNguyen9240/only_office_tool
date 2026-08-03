@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import type { DocumentItem } from "@share";
 import { apiRequest } from "@/lib/api";
+import { translateApiError, useI18n } from "@/i18n";
 
 interface TagItem {
   id: string;
@@ -31,6 +32,7 @@ export function DocumentMetadataModal({
   onSaved,
 }: DocumentMetadataModalProps) {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [metadata, setMetadata] = useState("{}");
   const [newTag, setNewTag] = useState("");
@@ -83,7 +85,7 @@ export function DocumentMetadataModal({
       confirmLoading={saving}
       width={640}
     >
-      <Typography.Text strong>Tags</Typography.Text>
+      <Typography.Text strong>{locale === "vi" ? "Thẻ đánh dấu" : "Tags"}</Typography.Text>
       <Select
         mode="multiple"
         value={selectedTags}
@@ -96,7 +98,7 @@ export function DocumentMetadataModal({
         <Input
           value={newTag}
           onChange={(event) => setNewTag(event.target.value)}
-          placeholder="New tag"
+          placeholder={locale === "vi" ? "Thẻ mới" : "New tag"}
         />
         <Button
           icon={<PlusOutlined />}
@@ -111,11 +113,11 @@ export function DocumentMetadataModal({
             await refetch();
           }}
         >
-          Add
+          {locale === "vi" ? "Thêm" : "Add"}
         </Button>
       </Space.Compact>
       <Typography.Text strong style={{ display: "block", marginTop: 20 }}>
-        Custom metadata (JSON)
+        {locale === "vi" ? "Metadata tùy chỉnh (dạng JSON)" : "Custom metadata (JSON)"}
       </Typography.Text>
       <Input.TextArea
         value={metadata}

@@ -329,7 +329,7 @@ export function UsersPage() {
           <Input
             allowClear
             value={filters.query}
-            placeholder="Search name or email"
+            placeholder={locale === "vi" ? "Tìm tên hoặc email" : "Search name or email"}
             onChange={(event) => {
               setFilters((current) => ({ ...current, query: event.target.value }));
               setPage(1);
@@ -338,7 +338,7 @@ export function UsersPage() {
           <Select
             allowClear
             value={filters.department}
-            placeholder="Department"
+            placeholder={locale === "vi" ? "Phòng ban" : "Department"}
             options={departmentOptions}
             onChange={(value) => {
               setFilters((current) => ({ ...current, department: value }));
@@ -348,7 +348,7 @@ export function UsersPage() {
           <Select
             allowClear
             value={filters.role}
-            placeholder="Role"
+            placeholder={locale === "vi" ? "Vai trò" : "Role"}
             options={roleOptions}
             onChange={(value) => {
               setFilters((current) => ({ ...current, role: value }));
@@ -358,7 +358,7 @@ export function UsersPage() {
           <Select
             allowClear
             value={filters.status}
-            placeholder="Status"
+            placeholder={locale === "vi" ? "Trạng thái" : "Status"}
             options={statusOptions}
             onChange={(value) => {
               setFilters((current) => ({ ...current, status: value }));

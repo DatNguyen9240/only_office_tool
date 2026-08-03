@@ -18,6 +18,7 @@ import {
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
+import { translateApiError, useI18n } from "@/i18n";
 
 interface CommentItem {
   id: string;
@@ -38,6 +39,7 @@ export function CommentsPanel({
   canComment,
 }: CommentsPanelProps) {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const user = useAuthStore((state) => state.user);
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -57,9 +59,10 @@ export function CommentsPanel({
       });
       setContent("");
       await refetch();
-      message.success("Comment added");
+      message.success(locale === "vi" ? "Đã thêm bình luận" : "Comment added");
     } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : "Comment failed");
+      const text = cause instanceof Error ? cause.message : "Comment failed";
+      message.error(translateApiError(text, locale));
     } finally {
       setSubmitting(false);
     }
@@ -76,6 +79,7 @@ export function CommentsPanel({
   const remove = async (comment: CommentItem) => {
     await apiRequest(`/documents/${documentId}/comments/${comment.id}`, {
       method: "DELETE",
+      body: JSON.stringify({}),
     });
     await refetch();
   };
@@ -85,7 +89,7 @@ export function CommentsPanel({
       <div className="comments-panel-heading">
         <Space>
           <MessageOutlined />
-          <Typography.Text strong>Comments</Typography.Text>
+          <Typography.Text strong>{locale === "vi" ? "Bình luận" : "Comments"}</Typography.Text>
         </Space>
         <Typography.Text type="secondary">{data.length}</Typography.Text>
       </div>
@@ -95,7 +99,7 @@ export function CommentsPanel({
           emptyText: (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="No comments yet"
+              description={locale === "vi" ? "Chưa có bình luận nào" : "No comments yet"}
             />
           ),
         }}
@@ -111,13 +115,15 @@ export function CommentsPanel({
                 icon={<CheckCircleOutlined />}
                 onClick={() => void updateResolved(comment)}
               >
-                {comment.resolved ? "Reopen" : "Resolve"}
+                {comment.resolved
+                  ? (locale === "vi" ? "Mở lại" : "Reopen")
+                  : (locale === "vi" ? "Đã giải quyết" : "Resolve")}
               </Button>,
               ...(comment.author.id === user?.id
                 ? [
                     <Popconfirm
                       key="delete"
-                      title="Delete this comment?"
+                      title={locale === "vi" ? "Xóa bình luận này?" : "Delete this comment?"}
                       onConfirm={() => remove(comment)}
                     >
                       <Button
@@ -147,7 +153,7 @@ export function CommentsPanel({
                 <Space size={6}>
                   <Typography.Text strong>{comment.author.name}</Typography.Text>
                   <Typography.Text type="secondary">
-                    {new Date(comment.createdAt).toLocaleString()}
+                    {new Date(comment.createdAt).toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}
                   </Typography.Text>
                 </Space>
               }
@@ -167,7 +173,7 @@ export function CommentsPanel({
             onChange={(event) => setContent(event.target.value)}
             autoSize={{ minRows: 2, maxRows: 5 }}
             maxLength={5000}
-            placeholder="Add a comment. Mention someone with @name@company.com"
+            placeholder={locale === "vi" ? "Viết bình luận. Nhắc tới người khác bằng @email" : "Add a comment. Mention someone with @name@company.com"}
             onPressEnter={(event) => {
               if ((event.ctrlKey || event.metaKey) && content.trim()) {
                 void createComment();
@@ -180,12 +186,12 @@ export function CommentsPanel({
             disabled={!content.trim()}
             onClick={() => void createComment()}
           >
-            Comment
+            {locale === "vi" ? "Gửi bình luận" : "Comment"}
           </Button>
         </div>
       ) : (
         <Typography.Text type="secondary">
-          Commenter or Editor access is required to comment.
+          {locale === "vi" ? "Cần quyền Người bình luận hoặc Người chỉnh sửa để bình luận." : "Commenter or Editor access is required to comment."}
         </Typography.Text>
       )}
     </section>

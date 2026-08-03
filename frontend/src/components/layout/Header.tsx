@@ -23,6 +23,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAppStore } from "@/store/useAppStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiRequest } from "@/lib/api";
+import { useI18n } from "@/i18n";
 
 interface NotificationItem {
   id: string;
@@ -57,6 +58,7 @@ const routeLabels: Record<string, string> = {
 };
 
 export function Header() {
+  const { locale, t } = useI18n();
   const navigate = useNavigate();
   const location = useLocation();
   const [query, setQuery] = useState("");
@@ -87,13 +89,13 @@ export function Header() {
         className="global-search"
         prefix={<SearchOutlined />}
         aria-label="Search all documents"
-        placeholder="Search documents, folders, and people"
+        placeholder={t("header.search")}
         value={query}
         onChange={(event) => setQuery(event.target.value)}
         onPressEnter={() => navigate(`/search?q=${encodeURIComponent(query)}`)}
       />
       <Space size={4}>
-        <Tooltip title="Help center is not available yet">
+        <Tooltip title={locale === "vi" ? "Trung tâm hỗ trợ chưa sẵn sàng" : "Help center is not available yet"}>
           <Button
             className="header-secondary-action"
             disabled
