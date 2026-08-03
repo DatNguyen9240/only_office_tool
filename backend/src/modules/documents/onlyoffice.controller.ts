@@ -2,6 +2,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Query,
@@ -19,6 +21,7 @@ export class OnlyOfficeController {
   constructor(private readonly onlyOfficeService: OnlyOfficeService) {}
 
   @Post(":id/onlyoffice-callback")
+  @HttpCode(HttpStatus.OK)
   @UsePipes(new ValidationPipe({ transform: true, whitelist: false }))
   callback(
     @Param("id") id: string,
