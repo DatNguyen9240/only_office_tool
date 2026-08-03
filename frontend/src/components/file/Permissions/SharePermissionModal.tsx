@@ -7,6 +7,7 @@ import {
 } from "@ant-design/icons";
 import {
   App,
+  AutoComplete,
   Avatar,
   Button,
   Form,
@@ -47,6 +48,8 @@ export function SharePermissionModal({
   const [saving, setSaving] = useState(false);
   const [linkLoading, setLinkLoading] = useState(false);
   const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [systemUsers, setSystemUsers] = useState<Array<{ id: string; name?: string; email: string }>>([]);
+  const [userOptions, setUserOptions] = useState<Array<{ value: string; label: string }>>([]);
   const recipientType = Form.useWatch("recipientType", form) ?? "user";
   const permissionOptions = ["Viewer", "Commenter", "Editor", "Owner"].map((role) => {
     const keys = {
@@ -79,7 +82,40 @@ export function SharePermissionModal({
     apiRequest<GroupOption[]>("/groups")
       .then(setGroups)
       .catch(() => setGroups([]));
+
+    apiRequest<Array<{ id: string; name?: string; email: string }>>("/admin/users")
+      .then(setSystemUsers)
+      .catch(() => setSystemUsers([]));
   }, [open]);
+
+  const handleUserSearch = (text: string) => {
+    if (!text || text.trim() === "") {
+      setUserOptions([]);
+      return;
+    }
+    const query = text.toLowerCase();
+    const matches = systemUsers
+      .filter(
+        (u) =>
+          u.email.toLowerCase().includes(query) ||
+          (u.name && u.name.toLowerCase().includes(query)),
+      )
+      .map((u) => ({
+        value: u.email,
+        label: u.name ? `${u.name} <${u.email}>` : u.email,
+      }));
+
+    if (matches.length > 0) {
+      setUserOptions(matches);
+    } else if (!text.includes("@")) {
+      setUserOptions([
+        { value: `${text}@gmail.com`, label: `${text}@gmail.com` },
+        { value: `${text}@company.com`, label: `${text}@company.com` },
+      ]);
+    } else {
+      setUserOptions([{ value: text, label: text }]);
+    }
+  };
 
   const invite = async () => {
     const values = await form.validateFields();
@@ -240,7 +276,13 @@ export function SharePermissionModal({
               { type: "email", message: t("share.emailInvalid") },
             ]}
           >
-            <Input placeholder={t("share.emailPlaceholder")} prefix={<UserAddOutlined />} />
+            <AutoComplete
+              options={userOptions}
+              onSearch={handleUserSearch}
+              placeholder={t("share.emailPlaceholder")}
+            >
+              <Input prefix={<UserAddOutlined />} />
+            </AutoComplete>
           </Form.Item>
         )}
         <Form.Item label={t("share.permission")} name="role">

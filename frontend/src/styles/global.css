@@ -1807,6 +1807,17 @@ html[data-theme="dark"] .login-assurance > .anticon {
   overflow-x: auto;
 }
 
+.file-table {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.file-table .ant-table-container,
+.dashboard-recent .ant-card-body {
+  overflow: hidden !important;
+}
+
 /* Editor */
 .editor-page {
   display: flex;

@@ -17,7 +17,7 @@ import type { Key } from "react";
 import { FileTableSkeleton } from "@/components/common/LoadingSkeletons";
 import type { DocumentItem } from "@share";
 import { fileIcon, fileTypeLabels } from "@/components/file/Explorer/filePresentation";
-import { formatDate } from "@/lib/date";
+import { formatDate, formatRelativeDate } from "@/lib/date";
 
 interface FileTableProps {
   documents: DocumentItem[];
@@ -161,9 +161,21 @@ export function FileTable({
             <Typography.Text strong ellipsis={{ tooltip: record.name }}>
               {record.name}
             </Typography.Text>
-            {compact && (
-              <Typography.Text type="secondary" className="mobile-file-meta">
-                {fileTypeLabels[record.type]} · {record.modifiedAt}
+            {(compact || narrow) && (
+              <Typography.Text
+                type="secondary"
+                className="mobile-file-meta"
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  color: "#64748b",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: 160,
+                }}
+              >
+                {fileTypeLabels[record.type]} · {formatRelativeDate(record.modifiedAt)}
               </Typography.Text>
             )}
           </span>
@@ -182,9 +194,23 @@ export function FileTable({
       title: trash ? "Deleted" : "Modified",
       dataIndex: trash ? "deletedAt" : "modifiedAt",
       key: "modifiedAt",
-      width: 180,
+      width: 150,
       responsive: ["md"],
-      render: (val: string) => formatDate(val),
+      render: (val: string) => (
+        <span
+          style={{
+            whiteSpace: "nowrap",
+            fontSize: 13,
+            color: "#64748b",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            display: "inline-block",
+            maxWidth: "100%",
+          }}
+        >
+          {formatDate(val)}
+        </span>
+      ),
     },
     {
       title: "Size",
@@ -209,8 +235,8 @@ export function FileTable({
     {
       title: <span className="sr-only">Actions</span>,
       key: "actions",
-      width: 56,
-      fixed: "right",
+      width: 44,
+      fixed: (narrow || compact) ? undefined : "right",
       align: "center",
       render: (_: unknown, record: DocumentItem) => (
         <Dropdown menu={{ items: getActions(record) }} trigger={["click"]}>
@@ -227,9 +253,9 @@ export function FileTable({
     },
   ];
 
-  const displayColumns = narrow
+  const displayColumns = (narrow || compact)
     ? columns.filter((column: { key?: Key }) =>
-        ["name", "modifiedAt", "actions"].includes(String(column.key)),
+        ["name", "actions"].includes(String(column.key)),
       )
     : columns;
 
@@ -247,7 +273,7 @@ export function FileTable({
       rowClassName={(record: DocumentItem) => (record.id === selectedId ? "selected-row" : "")}
       rowKey="id"
       rowSelection={
-        compact
+        (compact || narrow)
           ? undefined
           : {
               columnWidth: 44,
