@@ -1413,7 +1413,7 @@ html[data-theme="dark"] .login-assurance > .anticon {
 
 .share-form {
   display: grid;
-  grid-template-columns: 140px minmax(240px, 1fr) 130px;
+  grid-template-columns: 130px minmax(260px, 1fr) 170px;
   gap: 12px;
   align-items: end;
   padding: 16px;

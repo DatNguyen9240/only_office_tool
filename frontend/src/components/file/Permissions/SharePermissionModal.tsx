@@ -221,7 +221,7 @@ export function SharePermissionModal({
           </span>
         </div>
       }
-      width={680}
+      width={720}
       onCancel={onClose}
       footer={[
         <Button
@@ -322,7 +322,7 @@ export function SharePermissionModal({
                 disabled={entry.role === "Owner"}
                 size="small"
                 value={entry.role}
-                style={{ width: 136 }}
+                style={{ width: 165 }}
                 options={permissionOptions}
                 onChange={(role) => void changeRole(entry, role)}
               />,
