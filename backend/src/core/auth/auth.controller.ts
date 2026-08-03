@@ -120,8 +120,10 @@ export class AuthController {
   passkeyRegistrationOptions(
     @CurrentUser() user: AuthenticatedUser,
     @Body() input: PasskeyRegistrationOptionsDto,
+    @Req() request: { headers: Record<string, string | string[] | undefined> },
   ) {
-    return this.passkeys.registrationOptions(user, input);
+    const origin = this.extractOrigin(request);
+    return this.passkeys.registrationOptions(user, input, origin);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -131,10 +133,12 @@ export class AuthController {
     @Body() input: PasskeyRegistrationVerifyDto,
     @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
   ) {
+    const origin = this.extractOrigin(request);
     return this.passkeys.verifyRegistration(
       user,
       input,
       this.requestContext(request),
+      origin,
     );
   }
 
@@ -142,8 +146,10 @@ export class AuthController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   passkeyAuthenticationOptions(
     @Body() input: PasskeyAuthenticationOptionsDto,
+    @Req() request: { headers: Record<string, string | string[] | undefined> },
   ) {
-    return this.passkeys.authenticationOptions(input);
+    const origin = this.extractOrigin(request);
+    return this.passkeys.authenticationOptions(input, origin);
   }
 
   @Post("passkeys/login/verify")
@@ -152,9 +158,11 @@ export class AuthController {
     @Body() input: PasskeyAuthenticationVerifyDto,
     @Req() request: { ip?: string; headers: Record<string, string | string[] | undefined> },
   ) {
+    const origin = this.extractOrigin(request);
     return this.passkeys.verifyAuthentication(
       input,
       this.requestContext(request),
+      origin,
     );
   }
 
@@ -182,5 +190,12 @@ export class AuthController {
       ip: request.ip,
       userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
     };
+  }
+
+  private extractOrigin(request: {
+    headers: Record<string, string | string[] | undefined>;
+  }): string | undefined {
+    const raw = request.headers.origin || request.headers.referer;
+    return Array.isArray(raw) ? raw[0] : raw;
   }
 }

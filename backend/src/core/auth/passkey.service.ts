@@ -50,10 +50,33 @@ export class PasskeyService {
     this.rpName = config.get<string>("WEBAUTHN_RP_NAME", "Meridian DMS");
   }
 
+  private resolveRpConfig(clientOrigin?: string) {
+    let origin = this.origin;
+    if (clientOrigin && (clientOrigin.startsWith("http://") || clientOrigin.startsWith("https://"))) {
+      origin = clientOrigin.replace(/\/$/, "");
+    }
+    try {
+      const url = new URL(origin);
+      return {
+        origin,
+        rpId: url.hostname,
+        rpName: this.rpName,
+      };
+    } catch {
+      return {
+        origin: this.origin,
+        rpId: this.rpId,
+        rpName: this.rpName,
+      };
+    }
+  }
+
   async registrationOptions(
     principal: AuthenticatedUser,
     input: PasskeyRegistrationOptionsDto,
+    clientOrigin?: string,
   ) {
+    const { rpId, rpName } = this.resolveRpConfig(clientOrigin);
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: principal.id },
       select: {
@@ -64,8 +87,8 @@ export class PasskeyService {
       },
     });
     const options = await generateRegistrationOptions({
-      rpName: this.rpName,
-      rpID: this.rpId,
+      rpName,
+      rpID: rpId,
       userID: new TextEncoder().encode(user.id),
       userName: user.email,
       userDisplayName: user.name,
@@ -95,7 +118,9 @@ export class PasskeyService {
     principal: AuthenticatedUser,
     input: PasskeyRegistrationVerifyDto,
     context: RequestContext = {},
+    clientOrigin?: string,
   ) {
+    const { origin, rpId } = this.resolveRpConfig(clientOrigin);
     const challenge = await this.prisma.webAuthnChallenge.findFirst({
       where: {
         id: input.challengeId,
@@ -113,8 +138,8 @@ export class PasskeyService {
       verification = await verifyRegistrationResponse({
         response: input.response as unknown as RegistrationResponseJSON,
         expectedChallenge: challenge.challenge,
-        expectedOrigin: this.origin,
-        expectedRPID: this.rpId,
+        expectedOrigin: origin,
+        expectedRPID: rpId,
         requireUserVerification: true,
       });
     } catch {
@@ -152,7 +177,11 @@ export class PasskeyService {
     return { id: credential.id, status: "registered" as const };
   }
 
-  async authenticationOptions(input: PasskeyAuthenticationOptionsDto) {
+  async authenticationOptions(
+    input: PasskeyAuthenticationOptionsDto,
+    clientOrigin?: string,
+  ) {
+    const { rpId } = this.resolveRpConfig(clientOrigin);
     const user = await this.prisma.user.findUnique({
       where: { email: input.email.trim().toLowerCase() },
       select: {
@@ -169,7 +198,7 @@ export class PasskeyService {
       throw new UnauthorizedException("No passkey is available for this account");
     }
     const options = await generateAuthenticationOptions({
-      rpID: this.rpId,
+      rpID: rpId,
       allowCredentials: user.passkeys.map((passkey) => ({
         id: passkey.id,
         transports: passkey.transports as AuthenticatorTransportFuture[],
@@ -187,7 +216,9 @@ export class PasskeyService {
   async verifyAuthentication(
     input: PasskeyAuthenticationVerifyDto,
     context: RequestContext = {},
+    clientOrigin?: string,
   ) {
+    const { origin, rpId } = this.resolveRpConfig(clientOrigin);
     const challenge = await this.prisma.webAuthnChallenge.findFirst({
       where: {
         id: input.challengeId,
@@ -224,8 +255,8 @@ export class PasskeyService {
       verification = await verifyAuthenticationResponse({
         response: input.response as unknown as AuthenticationResponseJSON,
         expectedChallenge: challenge.challenge,
-        expectedOrigin: this.origin,
-        expectedRPID: this.rpId,
+        expectedOrigin: origin,
+        expectedRPID: rpId,
         credential: {
           id: passkey.id,
           publicKey: new Uint8Array(passkey.publicKey),
