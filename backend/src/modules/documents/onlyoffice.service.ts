@@ -155,6 +155,7 @@ export class OnlyOfficeService implements OnModuleInit {
           download: true,
           print: true,
           comment: canEdit,
+          chat: canEdit,
         },
       },
       editorConfig: {
@@ -166,7 +167,6 @@ export class OnlyOfficeService implements OnModuleInit {
           name: user.name,
         },
         customization: {
-          chat: false,
           comments: true,
           zoom: 100,
           watermark: {
