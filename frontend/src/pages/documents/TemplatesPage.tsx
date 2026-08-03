@@ -15,6 +15,7 @@ import {
 } from "antd";
 import { useState } from "react";
 import { apiRequest } from "@/lib/api";
+import { translateApiError, useI18n } from "@/i18n";
 
 interface TemplateItem {
   id: string;
@@ -26,6 +27,7 @@ interface TemplateItem {
 
 export function TemplatesPage() {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const { data: templates = [], refetch } = useQuery({
@@ -35,21 +37,26 @@ export function TemplatesPage() {
 
   const create = async () => {
     const values = await form.validateFields();
-    await apiRequest("/templates", {
-      method: "POST",
-      body: JSON.stringify(values),
-    });
-    await refetch();
-    form.resetFields();
-    setOpen(false);
-    message.success("Template created");
+    try {
+      await apiRequest("/templates", {
+        method: "POST",
+        body: JSON.stringify(values),
+      });
+      await refetch();
+      form.resetFields();
+      setOpen(false);
+      message.success(locale === "vi" ? "Đã tạo mẫu thành công" : "Template created");
+    } catch (cause) {
+      const text = cause instanceof Error ? cause.message : "Could not create template";
+      message.error(translateApiError(text, locale));
+    }
   };
 
   return (
     <PageContainer
       ghost
-      title="Templates"
-      subTitle="Keep reusable document starting points for your team."
+      title={locale === "vi" ? "Mẫu tài liệu" : "Templates"}
+      subTitle={locale === "vi" ? "Lưu trữ các mẫu tài liệu chuẩn cho toàn bộ nhóm." : "Keep reusable document starting points for your team."}
       extra={[
         <Button
           key="create"
@@ -57,7 +64,7 @@ export function TemplatesPage() {
           icon={<PlusOutlined />}
           onClick={() => setOpen(true)}
         >
-          New template
+          {locale === "vi" ? "Tạo mẫu mới" : "New template"}
         </Button>,
       ]}
     >
@@ -65,14 +72,14 @@ export function TemplatesPage() {
         <List
           grid={{ gutter: 16, column: 3 }}
           dataSource={templates}
-          locale={{ emptyText: "No templates yet" }}
+          locale={{ emptyText: locale === "vi" ? "Chưa có mẫu nào" : "No templates yet" }}
           renderItem={(template) => (
             <List.Item>
               <Card
                 title={template.name}
                 extra={
                   <Popconfirm
-                    title="Delete this template?"
+                    title={locale === "vi" ? "Xóa mẫu này?" : "Delete this template?"}
                     onConfirm={async () => {
                       await apiRequest(`/templates/${template.id}`, {
                         method: "DELETE",
@@ -86,7 +93,7 @@ export function TemplatesPage() {
               >
                 <Space direction="vertical">
                   <span>{template.type}</span>
-                  <span>{template.description || "No description"}</span>
+                  <span>{template.description || (locale === "vi" ? "Chưa có mô tả" : "No description")}</span>
                 </Space>
               </Card>
             </List.Item>
@@ -94,26 +101,26 @@ export function TemplatesPage() {
         />
       </ProCard>
       <Modal
-        title="New template"
+        title={locale === "vi" ? "Tạo mẫu mới" : "New template"}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => void create()}
       >
         <Form form={form} layout="vertical">
-          <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+          <Form.Item name="name" label={locale === "vi" ? "Tên mẫu" : "Name"} rules={[{ required: true }]}>
             <Input maxLength={160} />
           </Form.Item>
-          <Form.Item name="type" label="File type" rules={[{ required: true }]}>
+          <Form.Item name="type" label={locale === "vi" ? "Loại tài liệu" : "File type"} rules={[{ required: true }]}>
             <Select
               options={[
-                { value: "DOCX", label: "Word document" },
-                { value: "XLSX", label: "Spreadsheet" },
-                { value: "PPTX", label: "Presentation" },
+                { value: "DOCX", label: locale === "vi" ? "Văn bản Word (.docx)" : "Word document" },
+                { value: "XLSX", label: locale === "vi" ? "Bảng tính Excel (.xlsx)" : "Spreadsheet" },
+                { value: "PPTX", label: locale === "vi" ? "Trình chiếu PowerPoint (.pptx)" : "Presentation" },
                 { value: "PDF", label: "PDF" },
               ]}
             />
           </Form.Item>
-          <Form.Item name="description" label="Description">
+          <Form.Item name="description" label={locale === "vi" ? "Mô tả" : "Description"}>
             <Input.TextArea maxLength={500} />
           </Form.Item>
         </Form>

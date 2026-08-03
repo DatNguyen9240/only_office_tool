@@ -16,6 +16,7 @@ import {
 import { useEffect, useState } from "react";
 import type { FolderItem } from "@/hooks/useFolders";
 import { apiRequest } from "@/lib/api";
+import { translateApiError, useI18n } from "@/i18n";
 
 interface GroupOption {
   id: string;
@@ -41,6 +42,7 @@ export function FolderPermissionModal({
   onClose,
 }: FolderPermissionModalProps) {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const [form] = Form.useForm();
   const recipientType = Form.useWatch("recipientType", form) ?? "user";
   const [permissions, setPermissions] = useState<FolderPermission[]>([]);
@@ -58,7 +60,8 @@ export function FolderPermissionModal({
       setPermissions(nextPermissions);
       setGroups(nextGroups);
     } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : "Could not load access");
+      const text = cause instanceof Error ? cause.message : "Could not load access";
+      message.error(translateApiError(text, locale));
     } finally {
       setLoading(false);
     }
@@ -71,27 +74,32 @@ export function FolderPermissionModal({
   const grant = async () => {
     if (!folder) return;
     const values = await form.validateFields();
-    await apiRequest(`/folders/${folder.id}/permissions`, {
-      method: "POST",
-      body: JSON.stringify(
-        values.recipientType === "group"
-          ? { groupId: values.groupId, role: values.role }
-          : { email: values.email, role: values.role },
-      ),
-    });
-    form.resetFields(["email", "groupId"]);
-    await load();
-    message.success("Folder access updated");
+    try {
+      await apiRequest(`/folders/${folder.id}/permissions`, {
+        method: "POST",
+        body: JSON.stringify(
+          values.recipientType === "group"
+            ? { groupId: values.groupId, role: values.role }
+            : { email: values.email, role: values.role },
+        ),
+      });
+      form.resetFields(["email", "groupId"]);
+      await load();
+      message.success(locale === "vi" ? "Đã cập nhật quyền truy cập thư mục" : "Folder access updated");
+    } catch (cause) {
+      const text = cause instanceof Error ? cause.message : "Could not grant access";
+      message.error(translateApiError(text, locale));
+    }
   };
 
   return (
     <Modal
       open={Boolean(folder)}
-      title={`Share ${folder?.name ?? "folder"}`}
+      title={locale === "vi" ? `Chia sẻ thư mục ${folder?.name ?? ""}` : `Share ${folder?.name ?? "folder"}`}
       onCancel={onClose}
       footer={[
         <Button key="done" type="primary" onClick={onClose}>
-          Done
+          {t("common.done")}
         </Button>,
       ]}
     >
@@ -100,16 +108,16 @@ export function FolderPermissionModal({
         layout="vertical"
         initialValues={{ recipientType: "user", role: "VIEWER" }}
       >
-        <Form.Item name="recipientType" label="Recipient type">
+        <Form.Item name="recipientType" label={locale === "vi" ? "Loại đối tượng" : "Recipient type"}>
           <Select
             options={[
-              { value: "user", label: "Person" },
-              { value: "group", label: "Group" },
+              { value: "user", label: locale === "vi" ? "Cá nhân" : "Person" },
+              { value: "group", label: locale === "vi" ? "Nhóm" : "Group" },
             ]}
           />
         </Form.Item>
         {recipientType === "group" ? (
-          <Form.Item name="groupId" label="Group" rules={[{ required: true }]}>
+          <Form.Item name="groupId" label={locale === "vi" ? "Chọn nhóm" : "Group"} rules={[{ required: true }]}>
             <Select
               showSearch
               optionFilterProp="label"
@@ -122,18 +130,18 @@ export function FolderPermissionModal({
         ) : (
           <Form.Item
             name="email"
-            label="Work email"
+            label={locale === "vi" ? "Email làm việc" : "Work email"}
             rules={[{ required: true }, { type: "email" }]}
           >
             <Input prefix={<UserAddOutlined />} />
           </Form.Item>
         )}
-        <Form.Item name="role" label="Permission">
+        <Form.Item name="role" label={locale === "vi" ? "Quyền truy cập" : "Permission"}>
           <Select
             options={[
-              { value: "VIEWER", label: "Viewer" },
-              { value: "COMMENTER", label: "Commenter" },
-              { value: "EDITOR", label: "Editor" },
+              { value: "VIEWER", label: locale === "vi" ? "Người xem" : "Viewer" },
+              { value: "COMMENTER", label: locale === "vi" ? "Người bình luận" : "Commenter" },
+              { value: "EDITOR", label: locale === "vi" ? "Người chỉnh sửa" : "Editor" },
             ]}
           />
         </Form.Item>
@@ -142,14 +150,14 @@ export function FolderPermissionModal({
           icon={<ShareAltOutlined />}
           onClick={() => void grant()}
         >
-          Grant access
+          {locale === "vi" ? "Cấp quyền" : "Grant access"}
         </Button>
       </Form>
       <List
         loading={loading}
         style={{ marginTop: 20 }}
         dataSource={permissions}
-        locale={{ emptyText: "No additional access" }}
+        locale={{ emptyText: locale === "vi" ? "Chưa có quyền bổ sung nào" : "No additional access" }}
         renderItem={(permission) => (
           <List.Item
             actions={[
@@ -157,11 +165,11 @@ export function FolderPermissionModal({
                 key="role"
                 size="small"
                 value={permission.role}
-                style={{ width: 120 }}
+                style={{ width: 130 }}
                 options={[
-                  { value: "VIEWER", label: "Viewer" },
-                  { value: "COMMENTER", label: "Commenter" },
-                  { value: "EDITOR", label: "Editor" },
+                  { value: "VIEWER", label: locale === "vi" ? "Người xem" : "Viewer" },
+                  { value: "COMMENTER", label: locale === "vi" ? "Người bình luận" : "Commenter" },
+                  { value: "EDITOR", label: locale === "vi" ? "Người chỉnh sửa" : "Editor" },
                 ]}
                 onChange={async (role) => {
                   if (!folder) return;
@@ -174,7 +182,7 @@ export function FolderPermissionModal({
               />,
               <Popconfirm
                 key="remove"
-                title="Remove this access?"
+                title={locale === "vi" ? "Gỡ bỏ quyền này?" : "Remove this access?"}
                 onConfirm={async () => {
                   if (!folder) return;
                   await apiRequest(
@@ -190,7 +198,7 @@ export function FolderPermissionModal({
           >
             <List.Item.Meta
               title={permission.group?.name || permission.user?.name || permission.email}
-              description={permission.group ? "Group" : permission.email}
+              description={permission.group ? (locale === "vi" ? "Nhóm" : "Group") : permission.email}
             />
           </List.Item>
         )}

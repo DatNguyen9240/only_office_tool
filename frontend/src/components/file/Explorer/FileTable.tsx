@@ -281,8 +281,8 @@ export function FileTable({
       dataSource={documents}
       locale={{
         emptyText: trash
-          ? "Trash is empty"
-          : "No documents match the current folder and filters",
+          ? (locale === "vi" ? "Thùng rác trống" : "Trash is empty")
+          : (locale === "vi" ? "Không có tài liệu nào trong thư mục hiện tại" : "No documents match the current folder and filters"),
       }}
       pagination={documents.length > 10 ? { pageSize: 10, showSizeChanger: false } : false}
       rowClassName={(record: DocumentItem) => (record.id === selectedId ? "selected-row" : "")}
