@@ -17,6 +17,7 @@ declare global {
 
 interface OnlyOfficeEditorProps {
   documentId?: string;
+  showWatermark?: boolean;
 }
 
 interface EditorConfigResponse {
@@ -25,7 +26,10 @@ interface EditorConfigResponse {
   watermarkText?: string;
 }
 
-export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
+export function OnlyOfficeEditor({
+  documentId,
+  showWatermark = true,
+}: OnlyOfficeEditorProps) {
   const { locale, t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const editorInstanceRef = useRef<{ destroy?: () => void } | null>(null);
@@ -163,7 +167,7 @@ export function OnlyOfficeEditor({ documentId }: OnlyOfficeEditorProps) {
         hidden={loading || Boolean(error)}
         style={{ width: "100%", height: "100%" }}
       />
-      {!loading && !error && watermarkText && (
+      {showWatermark && !loading && !error && watermarkText && (
         <div
           style={{
             position: "absolute",

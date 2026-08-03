@@ -18,7 +18,7 @@
 - Link chia sẻ có hạn dùng, mật khẩu và thu hồi.
 - Comment, mention, notification và activity timeline.
 - Lock file, cảnh báo xung đột, hiển thị người đang chỉnh sửa.
-- Watermark theo người xem/quyền truy cập.
+- Watermark bảo mật theo người xem/quyền truy cập (hỗ trợ công tắc Bật/Tắt Watermark linh hoạt ngay trên thanh công cụ trình chỉnh sửa).
 
 ## Tìm kiếm và tổ chức
 

@@ -121,7 +121,8 @@ system, light, and dark theme modes. Translation resources live in
 
 The editor requests a per-document configuration from the API, including a
 signed document URL, a changing document key for each version, and a callback
-URL for saving new versions.
+URL for saving new versions. It includes an interactive UI toggle for showing
+or hiding the security watermark overlay on demand.
 
 ## Architecture
 
