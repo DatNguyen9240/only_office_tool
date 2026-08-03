@@ -122,13 +122,13 @@ export function OnlyOfficeEditor({
                   <div style={{ fontSize: 13, opacity: 0.85, marginTop: 4 }}>
                     {locale === "vi" ? (
                       <>
-                        📌 <strong>Nguyên nhân:</strong> Biến môi trường <code>ONLYOFFICE_SERVER_URL</code> trên Backend đang trỏ tới cổng 5001 (là dịch vụ <code>document-processor</code>) hoặc máy chủ ONLYOFFICE DocumentServer chưa sẵn sàng tại địa chỉ này.<br />
-                        🛠️ <strong>Cách khắc phục:</strong> Kiểm tra lại biến <code>ONLYOFFICE_SERVER_URL</code> trong tệp <code>backend/.env</code> (ví dụ: <code>ONLYOFFICE_SERVER_URL=http://103.190.38.46:8080</code> hoặc <code>http://localhost:8080</code>) rồi khởi động lại backend.
+                        📌 <strong>Nguyên nhân:</strong> Biến môi trường <code>ONLYOFFICE_SERVER_URL</code> trên Backend chưa chính xác hoặc máy chủ ONLYOFFICE DocumentServer chưa sẵn sàng tại địa chỉ này.<br />
+                        🛠️ <strong>Cách khắc phục:</strong> Kiểm tra lại cấu hình <code>ONLYOFFICE_SERVER_URL</code> trong tệp <code>backend/.env</code> (ví dụ: <code>ONLYOFFICE_SERVER_URL=http://localhost:5001</code> hoặc địa chỉ chạy thực tế của bạn) rồi khởi động lại backend.
                       </>
                     ) : (
                       <>
-                        📌 <strong>Reason:</strong> The <code>ONLYOFFICE_SERVER_URL</code> environment variable on the Backend points to port 5001 (which is the <code>document-processor</code> service) or ONLYOFFICE DocumentServer is unreachable.<br />
-                        🛠️ <strong>Fix:</strong> Verify <code>ONLYOFFICE_SERVER_URL</code> in <code>backend/.env</code> (e.g. <code>ONLYOFFICE_SERVER_URL=http://103.190.38.46:8080</code> or <code>http://localhost:8080</code>) and restart backend.
+                        📌 <strong>Reason:</strong> The <code>ONLYOFFICE_SERVER_URL</code> environment variable on the Backend is incorrect or the ONLYOFFICE DocumentServer is unreachable.<br />
+                        🛠️ <strong>Fix:</strong> Verify <code>ONLYOFFICE_SERVER_URL</code> in <code>backend/.env</code> (e.g. <code>ONLYOFFICE_SERVER_URL=http://localhost:5001</code> or your actual address) and restart backend.
                       </>
                     )}
                   </div>
