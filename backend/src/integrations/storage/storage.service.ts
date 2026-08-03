@@ -63,6 +63,8 @@ export class StorageService {
         region,
         endpoint: clientEndpoint,
         forcePathStyle,
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
         ...credentials,
       });
 
@@ -95,11 +97,12 @@ export class StorageService {
 
   async createDownloadUrl(objectKey: string) {
     this.ensureConfigured();
-    const url = await getSignedUrl(
+    const rawUrl = await getSignedUrl(
       this.publicClient,
       new GetObjectCommand({ Bucket: this.bucket, Key: objectKey }),
       { expiresIn: this.expiresIn },
     );
+    const url = rawUrl.replace(/&x-amz-checksum-mode=[^&]*/, "");
     return { url, expiresIn: this.expiresIn };
   }
 

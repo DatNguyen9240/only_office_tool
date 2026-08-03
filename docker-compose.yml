@@ -82,6 +82,8 @@ services:
       NODE_ENV: production
       PORT: 3000
       S3_ENDPOINT: http://minio:9000
+      S3_PUBLIC_ENDPOINT: ${S3_PUBLIC_ENDPOINT:-http://103.190.38.46:5678}
+      ONLYOFFICE_JWT_SECRET: QX3ihsr0IA7mMG4E6e7Fy3SCZ5Z6Tq
       MINIO_METRICS_URL: http://minio:9000
       MINIO_METRICS_TOKEN: ""
       REDIS_URL: redis://redis:6379
