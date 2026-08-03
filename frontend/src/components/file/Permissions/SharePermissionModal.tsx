@@ -221,7 +221,7 @@ export function SharePermissionModal({
           </span>
         </div>
       }
-      width={640}
+      width={680}
       onCancel={onClose}
       footer={[
         <Button
@@ -279,9 +279,11 @@ export function SharePermissionModal({
             <AutoComplete
               options={userOptions}
               onSearch={handleUserSearch}
-              placeholder={t("share.emailPlaceholder")}
             >
-              <Input prefix={<UserAddOutlined />} />
+              <Input
+                prefix={<UserAddOutlined />}
+                placeholder={t("share.emailPlaceholder")}
+              />
             </AutoComplete>
           </Form.Item>
         )}

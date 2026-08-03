@@ -672,7 +672,7 @@ html[data-theme="dark"] .login-assurance > .anticon {
 .document-workspace {
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
-  min-height: 620px;
+  min-height: 380px;
   overflow: hidden;
   border: 1px solid #e5eaf0;
   border-radius: 8px;
@@ -744,6 +744,7 @@ html[data-theme="dark"] .login-assurance > .anticon {
 
 .file-region {
   min-width: 0;
+  width: 100%;
   background: #fff;
 }
 
@@ -751,16 +752,17 @@ html[data-theme="dark"] .login-assurance > .anticon {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 52px;
-  padding: 0 16px;
+  min-height: 42px;
+  padding: 8px 16px;
   border-bottom: 1px solid #e5eaf0;
+  background: #fafbfc;
 }
 
 .document-selection-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-bottom: 1px solid #cbdcf1;
   background: #eaf1fb;
   gap: 12px;
@@ -769,11 +771,21 @@ html[data-theme="dark"] .login-assurance > .anticon {
 .file-region-heading > div {
   display: flex;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
 }
 
 .file-region-heading .ant-typography-secondary {
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 1px 8px;
+  border-radius: 10px;
+  line-height: 1.5;
+}
+
+.file-table {
+  width: 100%;
 }
 
 .file-table .ant-table {
@@ -781,43 +793,67 @@ html[data-theme="dark"] .login-assurance > .anticon {
 }
 
 .file-table .ant-table-thead > tr > th {
-  color: #566277;
+  color: #475569;
   font-size: 12px;
   font-weight: 600;
+  background: #f8fafc;
+  padding: 8px 12px;
 }
 
 .file-table .ant-table-tbody > tr {
   cursor: pointer;
 }
 
+.file-table .ant-table-tbody > tr > td {
+  padding: 8px 12px;
+}
+
 .file-table .ant-table-tbody > tr.selected-row > td {
-  background: #edf3fa !important;
+  background: #f0f7ff !important;
 }
 
 .file-table .ant-table-tbody > tr.selected-row > td:first-child {
-  box-shadow: inset 3px 0 #275dad;
+  box-shadow: inset 3px 0 0 #2563eb;
 }
 
 .file-name-cell {
   display: flex;
   min-width: 0;
-  max-width: 360px;
+  flex: 1;
   flex-direction: column;
+  justify-content: center;
 }
 
 .mobile-file-meta {
   display: block;
-  margin-top: 2px;
-  font-size: 12px;
+  margin-top: 1px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.2;
 }
 
 .file-type-icon {
   display: inline-grid;
-  width: 34px;
-  height: 34px;
-  flex: 0 0 34px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 6px;
+}
+
+.action-btn-compact {
+  width: 28px !important;
+  height: 28px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  color: #64748b !important;
+}
+
+.action-btn-compact:hover {
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 .file-type-icon > .anticon {
@@ -1377,8 +1413,8 @@ html[data-theme="dark"] .login-assurance > .anticon {
 
 .share-form {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px auto;
-  gap: 10px;
+  grid-template-columns: 140px minmax(240px, 1fr) 130px;
+  gap: 12px;
   align-items: end;
   padding: 16px;
   border: 1px solid #e3e8ee;
@@ -1407,7 +1443,8 @@ html[data-theme="dark"] .login-assurance > .anticon {
 }
 
 .share-invite-button {
-  align-self: end;
+  grid-column: 1 / -1;
+  margin-top: 4px;
 }
 
 .permission-list-heading {

@@ -154,26 +154,18 @@ export function FileTable({
       dataIndex: "name",
       key: "name",
       sorter: (a: DocumentItem, b: DocumentItem) => a.name.localeCompare(b.name),
+      ellipsis: true,
       render: (_: unknown, record: DocumentItem) => (
-        <Space size={12}>
-          {fileIcon(record.type)}
+        <Space size={10} style={{ width: "100%", overflow: "hidden" }}>
+          {fileIcon(record.type, 16)}
           <span className="file-name-cell">
-            <Typography.Text strong ellipsis={{ tooltip: record.name }}>
+            <Typography.Text strong ellipsis={{ tooltip: record.name }} style={{ fontSize: 13, color: "inherit" }}>
               {record.name}
             </Typography.Text>
             {(compact || narrow) && (
               <Typography.Text
                 type="secondary"
                 className="mobile-file-meta"
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  color: "#64748b",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  maxWidth: 160,
-                }}
               >
                 {fileTypeLabels[record.type]} · {formatRelativeDate(record.modifiedAt)}
               </Typography.Text>
@@ -187,20 +179,20 @@ export function FileTable({
       dataIndex: "owner",
       key: "owner",
       responsive: ["lg"],
-      width: 160,
+      width: 140,
       ellipsis: true,
     },
     {
       title: trash ? "Deleted" : "Modified",
       dataIndex: trash ? "deletedAt" : "modifiedAt",
       key: "modifiedAt",
-      width: 150,
+      width: 140,
       responsive: ["md"],
       render: (val: string) => (
         <span
           style={{
             whiteSpace: "nowrap",
-            fontSize: 13,
+            fontSize: 12,
             color: "#64748b",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -216,7 +208,7 @@ export function FileTable({
       title: "Size",
       dataIndex: "size",
       key: "size",
-      width: 92,
+      width: 88,
       responsive: ["xl"],
       align: "right",
     },
@@ -224,10 +216,10 @@ export function FileTable({
       title: "Status",
       dataIndex: "status",
       key: "status",
-      width: 112,
+      width: 108,
       responsive: ["lg"],
       render: (status: DocumentItem["status"]) => (
-        <Tag color={statusMap[status].color} bordered={false}>
+        <Tag color={statusMap[status].color} bordered={false} style={{ margin: 0 }}>
           {status === "locked" && <LockOutlined />} {statusMap[status].label}
         </Tag>
       ),
@@ -236,7 +228,6 @@ export function FileTable({
       title: <span className="sr-only">Actions</span>,
       key: "actions",
       width: 44,
-      fixed: (narrow || compact) ? undefined : "right",
       align: "center",
       render: (_: unknown, record: DocumentItem) => (
         <Dropdown menu={{ items: getActions(record) }} trigger={["click"]}>
@@ -245,6 +236,8 @@ export function FileTable({
               aria-label={`Actions for ${record.name}`}
               icon={<EllipsisOutlined />}
               type="text"
+              size="small"
+              className="action-btn-compact"
               onClick={(event) => event.stopPropagation()}
             />
           </Tooltip>
@@ -276,14 +269,14 @@ export function FileTable({
         (compact || narrow)
           ? undefined
           : {
-              columnWidth: 44,
+              columnWidth: 40,
               selectedRowKeys: selectedIds,
               onChange: (keys) =>
                 onSelectionChange?.(keys.map((key) => String(key))),
             }
       }
-      scroll={narrow ? undefined : { x: 860 }}
-      size="middle"
+      scroll={narrow || compact ? undefined : { x: "max-content" }}
+      size="small"
       onRow={(record: DocumentItem) => ({
         onClick: () => onSelect?.(record),
         onDoubleClick: () => !trash && onOpen?.(record),

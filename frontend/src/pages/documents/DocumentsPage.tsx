@@ -448,7 +448,11 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
         />
       </div>
 
-      <div className={`document-workspace${showPreview ? " with-preview" : ""}${scope === "shared" ? " no-folders" : ""}`}>
+      <div
+        className={`document-workspace${showPreview ? " with-preview" : ""}${
+          scope !== "all" || !screens.lg ? " no-folders" : ""
+        }`}
+      >
         {scope === "all" && screens.lg && folderPanel}
         <section className="file-region" aria-label={`${title} list`}>
           <div className="file-region-heading">
