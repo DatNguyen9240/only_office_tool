@@ -97,12 +97,14 @@ export class StorageService {
 
   async createDownloadUrl(objectKey: string) {
     this.ensureConfigured();
-    const rawUrl = await getSignedUrl(
+    const url = await getSignedUrl(
       this.publicClient,
       new GetObjectCommand({ Bucket: this.bucket, Key: objectKey }),
-      { expiresIn: this.expiresIn },
+      {
+        expiresIn: this.expiresIn,
+        signableHeaders: new Set(["host"]),
+      },
     );
-    const url = rawUrl.replace(/&x-amz-checksum-mode=[^&]*/, "");
     return { url, expiresIn: this.expiresIn };
   }
 
