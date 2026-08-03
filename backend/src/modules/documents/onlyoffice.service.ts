@@ -169,15 +169,19 @@ export class OnlyOfficeService implements OnModuleInit {
         customization: {
           comments: true,
           zoom: 100,
-          watermark: {
-            align: "Right" as const,
-            fillOpacity: isReadOnly ? 0.15 : 0.06,
-            height: 100,
-            rotate: -45,
-            text: watermarkText,
-            type: "rect" as const,
-            width: 100,
-          },
+          ...(isReadOnly
+            ? {
+                watermark: {
+                  align: "Right" as const,
+                  fillOpacity: 0.15,
+                  height: 100,
+                  rotate: -45,
+                  text: watermarkText,
+                  type: "rect" as const,
+                  width: 100,
+                },
+              }
+            : {}),
         },
       },
     };
