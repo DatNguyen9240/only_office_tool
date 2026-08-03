@@ -7,8 +7,9 @@ services:
         required: false
     environment:
       MINIO_PROMETHEUS_AUTH_TYPE: public
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
     ports:
-      - "30389:9000"
+      - "5678:9000"
       - "9621:9001"
     volumes:
       - "${MINIO_DATA_PATH:-./.data/minio}:/data"
