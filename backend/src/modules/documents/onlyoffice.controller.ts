@@ -19,7 +19,7 @@ export class OnlyOfficeController {
   constructor(private readonly onlyOfficeService: OnlyOfficeService) {}
 
   @Post(":id/onlyoffice-callback")
-  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: false }))
   callback(
     @Param("id") id: string,
     @Query() query: OnlyOfficeCallbackQueryDto,

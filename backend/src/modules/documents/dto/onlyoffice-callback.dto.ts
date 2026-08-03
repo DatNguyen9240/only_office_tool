@@ -46,4 +46,8 @@ export class OnlyOfficeCallbackDto {
   @IsOptional()
   @IsString()
   history?: unknown;
+
+  @IsOptional()
+  @IsString()
+  token?: string;
 }
