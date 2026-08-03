@@ -468,28 +468,30 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
           </div>
           {selectedIds.length > 0 && (
             <div className="document-selection-bar">
-              <Typography.Text strong>{selectedIds.length} selected</Typography.Text>
+              <Typography.Text strong>
+                {locale === "vi" ? `Đã chọn ${selectedIds.length} tài liệu` : `${selectedIds.length} selected`}
+              </Typography.Text>
               <Space wrap>
                 <Button
                   size="small"
                   icon={<FolderOpenOutlined />}
                   onClick={() => setBatchMoveOpen(true)}
                 >
-                  Move
+                  {locale === "vi" ? "Di chuyển" : "Move"}
                 </Button>
                 <Button
                   size="small"
                   icon={<ShareAltOutlined />}
                   onClick={() => setBatchShareOpen(true)}
                 >
-                  Share
+                  {locale === "vi" ? "Chia sẻ" : "Share"}
                 </Button>
                 <Button
                   size="small"
                   icon={<DownloadOutlined />}
                   onClick={() => void batchDownload()}
                 >
-                  Download
+                  {locale === "vi" ? "Tải xuống" : "Download"}
                 </Button>
                 <Button
                   danger
@@ -497,15 +499,17 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
                   icon={<DeleteOutlined />}
                   onClick={() =>
                     modal.confirm({
-                      title: `Move ${selectedIds.length} documents to trash?`,
+                      title: locale === "vi"
+                        ? `Chuyển ${selectedIds.length} tài liệu vào thùng rác?`
+                        : `Move ${selectedIds.length} documents to trash?`,
                       onOk: batchDelete,
                     })
                   }
                 >
-                  Delete
+                  {locale === "vi" ? "Xóa" : "Delete"}
                 </Button>
                 <Button type="text" size="small" onClick={() => setSelectedIds([])}>
-                  Clear
+                  {locale === "vi" ? "Bỏ chọn" : "Clear"}
                 </Button>
               </Space>
             </div>
@@ -515,6 +519,8 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
               documents={filtered}
               loading={isLoading}
               selectedId={selectedDocumentId}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
               compact={!screens.md}
               narrow={showPreview || !screens.md}
               onSelect={(document) => {
@@ -535,8 +541,6 @@ export function DocumentsPage({ scope = "all" }: DocumentsPageProps) {
                 setMoveFolderId(document.folderId);
               }}
               onStar={(document) => void toggleStar(document)}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
             />
           ) : isLoading ? (
             <FileCardGridSkeleton />

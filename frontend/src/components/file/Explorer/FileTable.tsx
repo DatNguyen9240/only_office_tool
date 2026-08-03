@@ -288,7 +288,7 @@ export function FileTable({
       rowClassName={(record: DocumentItem) => (record.id === selectedId ? "selected-row" : "")}
       rowKey="id"
       rowSelection={
-        (compact || narrow)
+        compact
           ? undefined
           : {
               columnWidth: 40,
