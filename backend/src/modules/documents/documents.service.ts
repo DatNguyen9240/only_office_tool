@@ -235,10 +235,7 @@ export class DocumentsService {
 
     try {
       const document = await this.prisma.document.update({
-        where: {
-          id,
-          version: targetVersion,
-        },
+        where: { id },
         data: {
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.folderId === undefined ? {} : { folderId: input.folderId }),
@@ -268,7 +265,7 @@ export class DocumentsService {
     const document = await this.ensureOwnedDocument(id, user);
     try {
       await this.prisma.document.update({
-        where: { id, version: document.version },
+        where: { id },
         data: {
           deletedAt: new Date(),
           status: DocumentStatus.DELETED,
@@ -300,7 +297,7 @@ export class DocumentsService {
     const ownedDocument = await this.ensureOwnedDocument(id, user);
     try {
       const document = await this.prisma.document.update({
-        where: { id, version: ownedDocument.version },
+        where: { id },
         data: {
           deletedAt: null,
           status: DocumentStatus.READY,
@@ -346,6 +343,21 @@ export class DocumentsService {
     const keysToDelete = document.versions.map((version) => version.objectKey);
 
     try {
+      await this.prisma.document.update({
+        where: { id },
+        data: { currentVersionId: null },
+      });
+
+      await this.prisma.$transaction([
+        this.prisma.documentVersion.deleteMany({ where: { documentId: id } }),
+        this.prisma.documentPermission.deleteMany({ where: { documentId: id } }),
+        this.prisma.shareLink.deleteMany({ where: { documentId: id } }),
+        this.prisma.documentFavorite.deleteMany({ where: { documentId: id } }),
+        this.prisma.comment.deleteMany({ where: { documentId: id } }),
+        this.prisma.uploadIntent.deleteMany({ where: { documentId: id } }),
+        this.prisma.documentTag.deleteMany({ where: { documentId: id } }),
+      ]);
+
       await this.prisma.document.delete({ where: { id } });
     } catch (error) {
       if (
@@ -401,6 +413,21 @@ export class DocumentsService {
       const keysToDelete = documents.flatMap((document) =>
         document.versions.map((version) => version.objectKey),
       );
+
+      await tx.document.updateMany({
+        where: { id: { in: docIds } },
+        data: { currentVersionId: null },
+      });
+
+      await Promise.all([
+        tx.documentVersion.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.documentPermission.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.shareLink.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.documentFavorite.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.comment.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.uploadIntent.deleteMany({ where: { documentId: { in: docIds } } }),
+        tx.documentTag.deleteMany({ where: { documentId: { in: docIds } } }),
+      ]);
 
       const deleted = await tx.document.deleteMany({
         where: {

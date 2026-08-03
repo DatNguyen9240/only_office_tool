@@ -13,6 +13,7 @@ import {
 } from "@ant-design/icons";
 import { Button, Dropdown, Space, Table, Tag, Tooltip, Typography } from "antd";
 import type { MenuProps, TableProps } from "antd";
+import { useState } from "react";
 import type { Key } from "react";
 import { FileTableSkeleton } from "@/components/common/LoadingSkeletons";
 import type { DocumentItem } from "@share";
@@ -67,9 +68,24 @@ export function FileTable({
   selectedIds = [],
   onSelectionChange,
 }: FileTableProps) {
+  const [internalSelectedIds, setInternalSelectedIds] = useState<Key[]>([]);
+
   if (loading) {
     return <FileTableSkeleton narrow={narrow} />;
   }
+
+  const activeSelectedKeys = onSelectionChange
+    ? selectedIds
+    : internalSelectedIds.map(String);
+
+  const handleSelectionChange = (keys: Key[]) => {
+    const stringKeys = keys.map((key) => String(key));
+    if (onSelectionChange) {
+      onSelectionChange(stringKeys);
+    } else {
+      setInternalSelectedIds(keys);
+    }
+  };
 
   const getActions = (record: DocumentItem): MenuProps["items"] =>
     trash
@@ -270,9 +286,8 @@ export function FileTable({
           ? undefined
           : {
               columnWidth: 40,
-              selectedRowKeys: selectedIds,
-              onChange: (keys) =>
-                onSelectionChange?.(keys.map((key) => String(key))),
+              selectedRowKeys: activeSelectedKeys,
+              onChange: handleSelectionChange,
             }
       }
       scroll={narrow || compact ? undefined : { x: "max-content" }}
