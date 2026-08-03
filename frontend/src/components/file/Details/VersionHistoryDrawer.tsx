@@ -15,6 +15,7 @@ import {
 } from "antd";
 import { translateApiError, useI18n } from "@/i18n";
 import { apiRequest } from "@/lib/api";
+import { formatDate } from "@/lib/date";
 import type { DocumentItem } from "@share";
 
 interface VersionItem {
@@ -171,7 +172,7 @@ export function VersionHistoryDrawer({
                   )}
                 </Space>
                 <Typography.Text type="secondary">
-                  {item.author}, {item.modifiedAt}, {item.size}
+                  {item.author}, {formatDate(item.modifiedAt)}, {item.size}
                 </Typography.Text>
                 <Space>
                   {!isCurrent && (

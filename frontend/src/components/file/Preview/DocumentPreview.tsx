@@ -21,6 +21,8 @@ interface DocumentPreviewProps {
   onMetadata?: () => void;
 }
 
+import { formatDate } from "@/lib/date";
+
 export function DocumentPreview({
   document,
   onOpen,
@@ -80,7 +82,9 @@ export function DocumentPreview({
       </div>
       <Descriptions column={1} size="small" className="preview-details">
         <Descriptions.Item label="Owner">{document.owner}</Descriptions.Item>
-        <Descriptions.Item label="Modified">{document.modifiedAt}</Descriptions.Item>
+        <Descriptions.Item label="Modified">
+          {formatDate(document.modifiedAt)}
+        </Descriptions.Item>
         <Descriptions.Item label="Access">
           <Tag bordered={false}>{document.permission ?? "Private"}</Tag>
         </Descriptions.Item>

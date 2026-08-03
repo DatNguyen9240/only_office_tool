@@ -17,6 +17,7 @@ import type { Key } from "react";
 import { FileTableSkeleton } from "@/components/common/LoadingSkeletons";
 import type { DocumentItem } from "@share";
 import { fileIcon, fileTypeLabels } from "@/components/file/Explorer/filePresentation";
+import { formatDate } from "@/lib/date";
 
 interface FileTableProps {
   documents: DocumentItem[];
@@ -181,8 +182,9 @@ export function FileTable({
       title: trash ? "Deleted" : "Modified",
       dataIndex: trash ? "deletedAt" : "modifiedAt",
       key: "modifiedAt",
-      width: 160,
+      width: 180,
       responsive: ["md"],
+      render: (val: string) => formatDate(val),
     },
     {
       title: "Size",
