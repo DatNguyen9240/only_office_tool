@@ -1,12 +1,15 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   Post,
   Query,
+  Res,
   UsePipes,
   ValidationPipe,
 } from "@nestjs/common";
+import type { Response } from "express";
 import { OnlyOfficeService } from "./onlyoffice.service";
 import { OnlyOfficeCallbackDto } from "./dto/onlyoffice-callback.dto";
 import { OnlyOfficeCallbackQueryDto } from "./dto/onlyoffice-callback-query.dto";
@@ -27,5 +30,14 @@ export class OnlyOfficeController {
       query.ticket,
       body,
     );
+  }
+
+  @Get(":id/onlyoffice-file")
+  downloadFile(
+    @Param("id") id: string,
+    @Query("ticket") ticket: string,
+    @Res() res: Response,
+  ) {
+    return this.onlyOfficeService.streamOnlyOfficeFile(id, ticket, res);
   }
 }

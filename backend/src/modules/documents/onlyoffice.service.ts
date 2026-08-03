@@ -1,3 +1,4 @@
+import type { Response } from "express";
 import {
   BadRequestException,
   Injectable,
@@ -118,10 +119,6 @@ export class OnlyOfficeService implements OnModuleInit {
       throw new NotFoundException("Document has no uploaded version");
     }
 
-    const documentUrl = (
-      await this.storage.createDownloadUrl(currentVersion.objectKey)
-    ).url;
-
     const callbackTicket = await this.jwt.signAsync<OnlyOfficeTicket>(
       {
         type: "onlyoffice-callback",
@@ -131,10 +128,13 @@ export class OnlyOfficeService implements OnModuleInit {
       { secret: jwtSecret, expiresIn: "24h" },
     );
 
-    const callbackUrl = `${apiPublicUrl.replace(
-      /\/$/,
-      "",
-    )}/documents/${document.id}/onlyoffice-callback?ticket=${encodeURIComponent(
+    const baseUrl = apiPublicUrl.replace(/\/$/, "");
+
+    const documentUrl = `${baseUrl}/documents/${document.id}/onlyoffice-file?ticket=${encodeURIComponent(
+      callbackTicket,
+    )}`;
+
+    const callbackUrl = `${baseUrl}/documents/${document.id}/onlyoffice-callback?ticket=${encodeURIComponent(
       callbackTicket,
     )}`;
 
@@ -440,5 +440,47 @@ export class OnlyOfficeService implements OnModuleInit {
   private readPositiveNumber(value: string | undefined, fallback: number) {
     const parsed = Number(value);
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  }
+
+  async streamOnlyOfficeFile(
+    id: string,
+    ticket: string,
+    res: Response,
+  ) {
+    const jwtSecret = this.getRequiredConfig("ONLYOFFICE_JWT_SECRET");
+    const principal = await this.verifyCallbackTicket(ticket, id, jwtSecret);
+
+    const document = await this.prisma.document.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, name: true, type: true, currentVersionId: true },
+    });
+    if (!document) throw new NotFoundException("Document not found");
+
+    const currentVersion = document.currentVersionId
+      ? await this.prisma.documentVersion.findUnique({
+          where: { id: document.currentVersionId },
+          select: { objectKey: true },
+        })
+      : await this.prisma.documentVersion.findFirst({
+          where: { documentId: document.id },
+          orderBy: { version: "desc" },
+          select: { objectKey: true },
+        });
+
+    if (!currentVersion) {
+      throw new NotFoundException("Document has no uploaded version");
+    }
+
+    const buffer = await this.storage.getObjectBuffer(currentVersion.objectKey);
+    const mimeType =
+      DOCUMENT_MIME_TYPES[document.type] ?? "application/octet-stream";
+
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Length", String(buffer.length));
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(document.name)}"`,
+    );
+    res.send(buffer);
   }
 }
