@@ -26,6 +26,7 @@ import { useSearchParams } from "react-router-dom";
 import type { AuthUser } from "@share";
 import { apiRequest } from "@/lib/api";
 import { useAuthStore } from "@/store/useAuthStore";
+import { translateApiError, useI18n } from "@/i18n";
 
 interface SessionItem {
   id: string;
@@ -47,6 +48,7 @@ interface PasskeyItem {
 
 export function SettingsPage() {
   const { message } = App.useApp();
+  const { locale, t } = useI18n();
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const bootstrap = useAuthStore((state) => state.bootstrap);
@@ -90,9 +92,10 @@ export function SettingsPage() {
       await refetchPasskeys();
       setPasskeyModalOpen(false);
       setPasskeyName("");
-      message.success("Passkey added");
+      message.success(locale === "vi" ? "Đã thêm Passkey thành công" : "Passkey added");
     } catch (cause) {
-      message.error(cause instanceof Error ? cause.message : "Could not add passkey");
+      const text = cause instanceof Error ? cause.message : "Could not add passkey";
+      message.error(translateApiError(text, locale));
     } finally {
       setPasskeySubmitting(false);
     }
@@ -101,8 +104,8 @@ export function SettingsPage() {
   return (
     <PageContainer
       ghost
-      title="Profile and security"
-      subTitle="Manage your account details, password, passkeys, and signed-in devices."
+      title={locale === "vi" ? "Hồ sơ & Bảo mật" : "Profile and security"}
+      subTitle={locale === "vi" ? "Quản lý thông tin tài khoản, mật khẩu, Passkey và các thiết bị đang đăng nhập." : "Manage your account details, password, passkeys, and signed-in devices."}
     >
       <ProCard>
         <Tabs
@@ -111,7 +114,7 @@ export function SettingsPage() {
           items={[
             {
               key: "profile",
-              label: "Profile",
+              label: locale === "vi" ? "Hồ sơ" : "Profile",
               icon: <UserOutlined />,
               children: profile && (
                 <Form
@@ -126,29 +129,33 @@ export function SettingsPage() {
                       queryClient.invalidateQueries({ queryKey: ["auth", "profile"] }),
                       bootstrap(),
                     ]);
-                    message.success("Profile updated");
+                    message.success(locale === "vi" ? "Đã cập nhật hồ sơ" : "Profile updated");
                   }}
                 >
-                  <Form.Item name="name" label="Name" rules={[{ required: true }]}>
+                  <Form.Item name="name" label={locale === "vi" ? "Họ và tên" : "Name"} rules={[{ required: true }]}>
                     <Input />
                   </Form.Item>
                   <Form.Item label="Email">
                     <Input value={profile.email} disabled />
                   </Form.Item>
-                  <Form.Item name="department" label="Department">
+                  <Form.Item name="department" label={locale === "vi" ? "Phòng ban" : "Department"}>
                     <Input />
                   </Form.Item>
-                  <Button type="primary" htmlType="submit">Save profile</Button>
+                  <Button type="primary" htmlType="submit">
+                    {locale === "vi" ? "Lưu hồ sơ" : "Save profile"}
+                  </Button>
                 </Form>
               ),
             },
             {
               key: "security",
-              label: "Security",
+              label: locale === "vi" ? "Bảo mật" : "Security",
               icon: <LockOutlined />,
               children: (
                 <>
-                  <Typography.Title level={5}>Change password</Typography.Title>
+                  <Typography.Title level={5}>
+                    {locale === "vi" ? "Đổi mật khẩu" : "Change password"}
+                  </Typography.Title>
                   <Form
                     layout="vertical"
                     onFinish={async (values) => {
@@ -156,20 +163,22 @@ export function SettingsPage() {
                         method: "POST",
                         body: JSON.stringify(values),
                       });
-                      message.success("Password changed. Sign in again on your devices.");
+                      message.success(locale === "vi" ? "Đã đổi mật khẩu. Vui lòng đăng nhập lại." : "Password changed. Sign in again on your devices.");
                     }}
                   >
-                    <Form.Item name="currentPassword" label="Current password" rules={[{ required: true }]}>
+                    <Form.Item name="currentPassword" label={locale === "vi" ? "Mật khẩu hiện tại" : "Current password"} rules={[{ required: true }]}>
                       <Input.Password autoComplete="current-password" />
                     </Form.Item>
                     <Form.Item
                       name="newPassword"
-                      label="New password"
+                      label={locale === "vi" ? "Mật khẩu mới" : "New password"}
                       rules={[{ required: true }, { min: 12 }]}
                     >
                       <Input.Password autoComplete="new-password" />
                     </Form.Item>
-                  <Button type="primary" htmlType="submit">Change password</Button>
+                    <Button type="primary" htmlType="submit">
+                      {locale === "vi" ? "Đổi mật khẩu" : "Change password"}
+                    </Button>
                   </Form>
                   <Divider />
                   <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
@@ -178,26 +187,26 @@ export function SettingsPage() {
                         Passkeys
                       </Typography.Title>
                       <Typography.Text type="secondary">
-                        Sign in with your device lock, fingerprint, or security key.
+                        {locale === "vi" ? "Đăng nhập bằng vân tay, khuôn mặt (FaceID) hoặc khóa bảo mật thiết bị." : "Sign in with your device lock, fingerprint, or security key."}
                       </Typography.Text>
                     </div>
                     <Button
                       icon={<SafetyCertificateOutlined />}
                       onClick={() => setPasskeyModalOpen(true)}
                     >
-                      Add passkey
+                      {locale === "vi" ? "Thêm Passkey" : "Add passkey"}
                     </Button>
                   </Space>
                   <List
                     style={{ marginTop: 12 }}
-                    locale={{ emptyText: "No passkeys registered" }}
+                    locale={{ emptyText: locale === "vi" ? "Chưa đăng ký Passkey nào" : "No passkeys registered" }}
                     dataSource={passkeys}
                     renderItem={(passkey) => (
                       <List.Item
                         actions={[
                           <Popconfirm
                             key="delete"
-                            title="Delete this passkey?"
+                            title={locale === "vi" ? "Xóa Passkey này?" : "Delete this passkey?"}
                             onConfirm={async () => {
                               await apiRequest(`/auth/passkeys/${encodeURIComponent(passkey.id)}`, {
                                 method: "DELETE",
@@ -206,7 +215,7 @@ export function SettingsPage() {
                             }}
                           >
                             <Button danger type="text" icon={<DeleteOutlined />}>
-                              Delete
+                              {locale === "vi" ? "Xóa" : "Delete"}
                             </Button>
                           </Popconfirm>,
                         ]}
@@ -214,13 +223,13 @@ export function SettingsPage() {
                         <List.Item.Meta
                           avatar={<SafetyCertificateOutlined />}
                           title={passkey.name || "Passkey"}
-                          description={`${passkey.backedUp ? "Synced" : "Device-bound"} · Added ${new Date(passkey.createdAt).toLocaleDateString()}${passkey.lastUsedAt ? ` · Last used ${new Date(passkey.lastUsedAt).toLocaleString()}` : ""}`}
+                          description={`${passkey.backedUp ? (locale === "vi" ? "Đồng bộ" : "Synced") : (locale === "vi" ? "Gắn với thiết bị" : "Device-bound")} · ${locale === "vi" ? "Đã thêm" : "Added"} ${new Date(passkey.createdAt).toLocaleDateString(locale === "vi" ? "vi-VN" : "en-US")}${passkey.lastUsedAt ? ` · ${locale === "vi" ? "Dùng lần cuối" : "Last used"} ${new Date(passkey.lastUsedAt).toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}` : ""}`}
                         />
                       </List.Item>
                     )}
                   />
                   <Typography.Title level={5} style={{ marginTop: 32 }}>
-                    Signed-in devices
+                    {locale === "vi" ? "Thiết bị đang đăng nhập" : "Signed-in devices"}
                   </Typography.Title>
                   <List
                     dataSource={sessions}
@@ -229,7 +238,7 @@ export function SettingsPage() {
                         actions={[
                           <Popconfirm
                             key="revoke"
-                            title="Revoke this session?"
+                            title={locale === "vi" ? "Thu hồi phiên đăng nhập này?" : "Revoke this session?"}
                             onConfirm={async () => {
                               await apiRequest(`/auth/sessions/${session.id}`, {
                                 method: "DELETE",
@@ -238,15 +247,15 @@ export function SettingsPage() {
                             }}
                           >
                             <Button danger type="text" icon={<DeleteOutlined />}>
-                              Revoke
+                              {locale === "vi" ? "Thu hồi" : "Revoke"}
                             </Button>
                           </Popconfirm>,
                         ]}
                       >
                         <List.Item.Meta
                           avatar={<LaptopOutlined />}
-                          title={session.userAgent || "Unknown device"}
-                          description={`${session.ip || "Unknown IP"} · Last used ${new Date(session.lastUsedAt).toLocaleString()}`}
+                          title={session.userAgent || (locale === "vi" ? "Thiết bị không xác định" : "Unknown device")}
+                          description={`${session.ip || "Unknown IP"} · ${locale === "vi" ? "Dùng lần cuối" : "Last used"} ${new Date(session.lastUsedAt).toLocaleString(locale === "vi" ? "vi-VN" : "en-US")}`}
                         />
                       </List.Item>
                     )}
@@ -258,23 +267,22 @@ export function SettingsPage() {
         />
       </ProCard>
       <Modal
-        title="Add a passkey"
+        title={locale === "vi" ? "Thêm Passkey mới" : "Add a passkey"}
         open={passkeyModalOpen}
         onCancel={() => setPasskeyModalOpen(false)}
         onOk={registerPasskey}
-        okText="Continue"
+        okText={locale === "vi" ? "Tiếp tục" : "Continue"}
         confirmLoading={passkeySubmitting}
       >
         <Typography.Paragraph type="secondary">
-          Give this passkey a recognizable name. Your browser will then ask you
-          to confirm with this device.
+          {locale === "vi" ? "Đặt tên gợi nhớ cho Passkey này (ví dụ: Laptop làm việc). Trình duyệt sẽ yêu cầu bạn xác nhận bằng vân tay hoặc mã PIN trên thiết bị này." : "Give this passkey a recognizable name. Your browser will then ask you to confirm with this device."}
         </Typography.Paragraph>
         <Input
           autoFocus
           maxLength={80}
           value={passkeyName}
           onChange={(event) => setPasskeyName(event.target.value)}
-          placeholder="e.g. Work laptop"
+          placeholder={locale === "vi" ? "Ví dụ: Laptop làm việc" : "e.g. Work laptop"}
         />
       </Modal>
     </PageContainer>
