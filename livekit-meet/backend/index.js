@@ -64,6 +64,8 @@ app.post('/api/token', async (req, res) => {
       serverUrl = `ws://${host}:8070`;
     }
 
+    console.log(`[Token API] Generated token for ${participantName} in room ${roomName} -> serverUrl: ${serverUrl}`);
+
     return res.json({
       token,
       serverUrl,
