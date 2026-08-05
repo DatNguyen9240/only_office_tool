@@ -26,7 +26,7 @@ services:
       - PUBLIC_LIVEKIT_URL=${PUBLIC_LIVEKIT_URL:-ws://localhost:30389}
       - PORT=5000
     ports:
-      - "5000:5000"
+      - "15673:5000"
     depends_on:
       livekit:
         condition: service_healthy
