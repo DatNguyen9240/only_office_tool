@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  livekit:
+    image: livekit/livekit-server:v1.6.0
+    command: --dev
+    ports:
+      - "9621:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    networks:
+      - livekit-net
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  token-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - LIVEKIT_URL=${LIVEKIT_URL:-ws://livekit:7880}
+      - PUBLIC_LIVEKIT_URL=${PUBLIC_LIVEKIT_URL:-ws://localhost:9621}
+      - PORT=5000
+    ports:
+      - "5000:5000"
+    depends_on:
+      livekit:
+        condition: service_healthy
+    networks:
+      - livekit-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  meet:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - token-api
+      - livekit
+    networks:
+      - livekit-net
+    restart: unless-stopped
+
+networks:
+  livekit-net:
+    driver: bridge
