@@ -28,7 +28,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'secret';
-const PUBLIC_LIVEKIT_URL = process.env.PUBLIC_LIVEKIT_URL || 'ws://localhost:30389';
+const PUBLIC_LIVEKIT_URL = process.env.PUBLIC_LIVEKIT_URL || 'ws://localhost:8070';
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -59,9 +59,9 @@ app.post('/api/token', async (req, res) => {
     const token = await at.toJwt();
 
     let serverUrl = PUBLIC_LIVEKIT_URL;
-    if (serverUrl === 'ws://localhost:30389' && req.headers.host) {
+    if ((serverUrl.includes('localhost') || serverUrl.includes('30389')) && req.headers.host) {
       const host = req.headers.host.split(':')[0];
-      serverUrl = `ws://${host}:30389`;
+      serverUrl = `ws://${host}:8070`;
     }
 
     return res.json({
