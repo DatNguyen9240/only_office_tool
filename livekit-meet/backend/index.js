@@ -6,16 +6,17 @@ const { AccessToken } = require('livekit-server-sdk');
 dotenv.config();
 
 const app = express();
+
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: '*',
+  allowedHeaders: '*'
 }));
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', '*');
+  res.header('Access-Control-Allow-Headers', '*');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -57,9 +58,15 @@ app.post('/api/token', async (req, res) => {
 
     const token = await at.toJwt();
 
+    let serverUrl = PUBLIC_LIVEKIT_URL;
+    if (serverUrl === 'ws://localhost:30389' && req.headers.host) {
+      const host = req.headers.host.split(':')[0];
+      serverUrl = `ws://${host}:30389`;
+    }
+
     return res.json({
       token,
-      serverUrl: PUBLIC_LIVEKIT_URL,
+      serverUrl,
     });
   } catch (error) {
     console.error('Lỗi sinh token:', error);
