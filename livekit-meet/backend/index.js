@@ -58,9 +58,9 @@ app.post('/api/token', async (req, res) => {
 
     const token = await at.toJwt();
 
-    let serverUrl = PUBLIC_LIVEKIT_URL;
-    if ((serverUrl.includes('localhost') || serverUrl.includes('30389')) && req.headers.host) {
-      const host = req.headers.host.split(':')[0];
+    let serverUrl = process.env.PUBLIC_LIVEKIT_URL;
+    if (!serverUrl || serverUrl.includes('localhost') || serverUrl.includes('9621') || serverUrl.includes('30389') || req.headers.host) {
+      const host = req.headers.host ? req.headers.host.split(':')[0] : 'localhost';
       serverUrl = `ws://${host}:8070`;
     }
 
