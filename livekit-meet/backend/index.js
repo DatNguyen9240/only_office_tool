@@ -12,7 +12,7 @@ app.use(express.json());
 const PORT = process.env.PORT || 5000;
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'secret';
-const PUBLIC_LIVEKIT_URL = process.env.PUBLIC_LIVEKIT_URL || 'ws://localhost:9621';
+const PUBLIC_LIVEKIT_URL = process.env.PUBLIC_LIVEKIT_URL || 'ws://localhost:30389';
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
