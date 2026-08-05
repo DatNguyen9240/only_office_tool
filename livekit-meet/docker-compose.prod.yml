@@ -28,7 +28,7 @@ services:
       - PUBLIC_LIVEKIT_URL=${PUBLIC_LIVEKIT_URL:-wss://livekit.ten-mien-cua-toi.com}
       - PORT=5000
     ports:
-      - "15673:5000"
+      - "5678:5000"
     depends_on:
       livekit:
         condition: service_healthy
