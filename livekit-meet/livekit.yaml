@@ -1,5 +1,6 @@
 port: 7880
 log_level: info
+development: true
 
 cors:
   allow_origins:
