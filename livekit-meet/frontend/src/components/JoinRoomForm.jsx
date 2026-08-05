@@ -9,7 +9,7 @@ function JoinRoomForm({ onJoined }) {
 
   const getApiUrl = () => {
     const host = window.location.hostname || 'localhost';
-    return `http://${host}:8090`;
+    return `http://${host}:15672`;
   };
 
   const API_URL = getApiUrl();
