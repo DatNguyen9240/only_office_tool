@@ -10,11 +10,6 @@ services:
       - "7882:7882/udp"
     networks:
       - livekit-net
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "7880"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
 
   token-api:
@@ -30,8 +25,7 @@ services:
     ports:
       - "15672:5000"
     depends_on:
-      livekit:
-        condition: service_healthy
+      - livekit
     networks:
       - livekit-net
     healthcheck:
