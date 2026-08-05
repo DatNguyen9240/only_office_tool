@@ -8,11 +8,7 @@ function JoinRoomForm({ onJoined }) {
   const [error, setError] = useState('');
 
   const getApiUrl = () => {
-    const envUrl = import.meta.env.VITE_API_URL;
-    if (envUrl && !envUrl.includes('localhost') && envUrl !== 'http://localhost:5678') {
-      return envUrl;
-    }
-    const host = window.location.hostname;
+    const host = window.location.hostname || 'localhost';
     return `http://${host}:5678`;
   };
 
