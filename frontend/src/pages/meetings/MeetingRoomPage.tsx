@@ -70,10 +70,11 @@ export const MeetingRoomPage: React.FC = () => {
       activeRoom
         .on(RoomEvent.Connected, () => {
           updateParticipants();
-          activeRoom.localParticipant.setMicrophoneEnabled(true);
-          activeRoom.localParticipant.setCameraEnabled(true);
           setJoined(true);
           setConnecting(false);
+          // Enable devices asynchronously without blocking connection
+          activeRoom.localParticipant.setMicrophoneEnabled(true).catch(console.warn);
+          activeRoom.localParticipant.setCameraEnabled(true).catch(console.warn);
         })
         .on(RoomEvent.ParticipantConnected, updateParticipants)
         .on(RoomEvent.ParticipantDisconnected, updateParticipants)
