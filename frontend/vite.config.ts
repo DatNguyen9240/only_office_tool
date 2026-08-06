@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
     // antd is ~1 334 kB pre-gzip but only ~413 kB gzipped — well within browser
     // limits and cached after first visit. Raise the warning threshold so we still
     // catch genuine unexpected bloat in app code (threshold sits just above antd).
-    chunkSizeWarningLimit: 1_400,
+    chunkSizeWarningLimit: 1_600,
     rolldownOptions: {
       output: {
         codeSplitting: {

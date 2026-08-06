@@ -21,6 +21,7 @@ import { AiModule } from "./integrations/ai/ai.module";
 import { WebhooksModule } from "./integrations/webhooks/webhooks.module";
 import { ProcessorModule } from "./integrations/processor/processor.module";
 import { GraphqlApiModule } from "./graphql/graphql-api.module";
+import { MeetingsModule } from "./modules/meetings/meetings.module";
 import { AppThrottlerGuard } from "./common/guards/app-throttler.guard";
 
 function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
@@ -76,6 +77,7 @@ function validateEnv(config: Record<string, unknown>): Record<string, unknown> {
     WebhooksModule,
     ProcessorModule,
     GraphqlApiModule,
+    MeetingsModule,
   ],
   providers: [
     {

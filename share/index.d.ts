@@ -139,3 +139,109 @@ export interface DependencyHealthResponse {
   status: DependencyStatus;
   timestamp: string;
 }
+
+export type MeetingStatus =
+  | "scheduled"
+  | "live"
+  | "recording"
+  | "processing"
+  | "transcribing"
+  | "analyzing"
+  | "completed"
+  | "failed";
+
+export interface MeetingItem {
+  id: string;
+  title: string;
+  roomName: string;
+  status: MeetingStatus;
+  scheduledAt?: string | null;
+  startedAt?: string | null;
+  endedAt?: string | null;
+  duration?: number | null;
+  videoUrl?: string | null;
+  errorMessage?: string | null;
+  createdById: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TranscriptWord {
+  word: string;
+  start: number;
+  end: number;
+  score?: number;
+}
+
+export interface TranscriptSegment {
+  id: number;
+  meetingId: string;
+  participantId: string;
+  participantName: string;
+  trackId?: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  confidence?: number;
+  words?: TranscriptWord[];
+}
+
+export interface MeetingTopic {
+  title: string;
+  summary: string;
+  startTime?: number;
+  endTime?: number;
+}
+
+export interface MeetingDecision {
+  id: string;
+  content: string;
+  decidedByParticipantIds: string[];
+  evidenceSegmentIds: number[];
+}
+
+export interface MeetingActionItem {
+  id: string;
+  task: string;
+  assigneeParticipantId: string | null;
+  assigneeName: string | null;
+  deadline: string | null;
+  status: "open" | "completed";
+  confidence: number;
+  evidenceSegmentIds: number[];
+}
+
+export interface MeetingRisk {
+  id: string;
+  risk: string;
+  mitigation?: string | null;
+  evidenceSegmentIds: number[];
+}
+
+export interface MeetingQuestion {
+  id: string;
+  question: string;
+  evidenceSegmentIds: number[];
+}
+
+export interface MeetingAnalysis {
+  title: string;
+  summary: string;
+  topics: MeetingTopic[];
+  decisions: MeetingDecision[];
+  actionItems: MeetingActionItem[];
+  risks: MeetingRisk[];
+  unansweredQuestions: MeetingQuestion[];
+}
+
+export interface MeetingPlaybackResponse {
+  meetingId: string;
+  title: string;
+  videoUrl: string | null;
+  duration: number;
+  peaks: number[];
+  transcriptUrl: string | null;
+  analysisStatus: MeetingStatus;
+}
+

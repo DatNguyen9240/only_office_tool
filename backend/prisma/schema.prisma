@@ -77,6 +77,7 @@ model User {
   folderPermissions FolderPermission[]
   templates     DocumentTemplate[]
   webhookSubscriptions WebhookSubscription[] @relation("WebhookOwner")
+  createdMeetings Meeting[]          @relation("MeetingCreator")
 }
 
 model RefreshSession {
@@ -427,6 +428,21 @@ model AuditLog {
   actorId      String?
   action       String
   resourceType String
+  expiresAt  DateTime?
+  createdById String
+  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime       @default(now())
+  revokedAt  DateTime?
+
+  @@index([documentId])
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  timestamp    DateTime @default(now())
+  actorId      String?
+  action       String
+  resourceType String
   resourceId   String?
   outcome      String
   ip           String?
@@ -437,4 +453,192 @@ model AuditLog {
   @@index([timestamp])
   @@index([actorId])
   @@index([resourceType, resourceId])
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  LIVE
+  RECORDING
+  PROCESSING
+  TRANSCRIBING
+  ANALYZING
+  COMPLETED
+  FAILED
+}
+
+enum MeetingRecordingType {
+  COMPOSITE
+  TRACK
+}
+
+model Meeting {
+  id           String               @id @default(cuid())
+  title        String
+  roomName     String               @unique
+  status       MeetingStatus        @default(SCHEDULED)
+  scheduledAt  DateTime?
+  startedAt    DateTime?
+  endedAt      DateTime?
+  duration     Float?
+  egressId     String?
+  videoObjectKey String?
+  peaksObjectKey String?
+  errorMessage String?
+  createdById  String
+  createdBy    User                 @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  participants MeetingParticipant[]
+  recordings   MeetingRecording[]
+  tracks       MeetingTrack[]
+  transcripts  MeetingTranscriptSegment[]
+  analysis     MeetingAnalysis?
+  jobs         MeetingProcessingJob[]
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model MeetingParticipant {
+  id            String               @id @default(cuid())
+  meetingId     String
+  participantId String               // LiveKit participant identity
+  name          String
+  audioObjectKey String?
+  joinedAt      DateTime             @default(now())
+  leftAt        DateTime?
+  meeting       Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  tracks        MeetingTrack[]
+  transcripts   MeetingTranscriptSegment[]
+
+  @@unique([meetingId, participantId])
+  @@index([meetingId])
+}
+
+model MeetingRecording {
+  id         String               @id @default(cuid())
+  meetingId  String
+  egressId   String
+  type       MeetingRecordingType @default(COMPOSITE)
+  objectKey  String
+  sizeBytes  BigInt?
+  duration   Float?
+  status     String               @default("ready")
+  meeting    Meeting              @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt  DateTime             @default(now())
+
+  @@index([meetingId])
+  @@index([egressId])
+}
+
+model MeetingTrack {
+  id            String             @id @default(cuid())
+  meetingId     String
+  participantId String
+  trackId       String
+  objectKey     String
+  duration      Float?
+  meeting       Meeting            @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  participant   MeetingParticipant @relation(fields: [meetingId, participantId], references: [meetingId, participantId], onDelete: Cascade)
+  createdAt     DateTime           @default(now())
+
+  @@unique([meetingId, trackId])
+  @@index([meetingId])
+}
+
+model MeetingTranscriptSegment {
+  id              Int                 @id @default(autoincrement())
+  meetingId       String
+  participantId   String
+  participantName String
+  trackId         String?
+  startTime       Float               // Start time in seconds relative to meeting start
+  endTime         Float               // End time in seconds relative to meeting start
+  text            String
+  confidence      Float?
+  words           Json?
+  meeting         Meeting             @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  participant     MeetingParticipant? @relation(fields: [meetingId, participantId], references: [meetingId, participantId], onDelete: SetNull)
+  createdAt       DateTime            @default(now())
+
+  @@index([meetingId, startTime])
+  @@index([participantId])
+}
+
+model MeetingAnalysis {
+  id          String            @id @default(cuid())
+  meetingId   String            @unique
+  title       String
+  summary     String
+  topics      Json              // MeetingTopic[]
+  meeting     Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  decisions   MeetingDecision[]
+  actionItems MeetingActionItem[]
+  risks       MeetingRisk[]
+  questions   MeetingQuestion[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model MeetingDecision {
+  id                      String          @id @default(cuid())
+  analysisId              String
+  content                 String
+  decidedByParticipantIds String[]
+  evidenceSegmentIds      Int[]
+  analysis                MeetingAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model MeetingActionItem {
+  id                    String          @id @default(cuid())
+  analysisId            String
+  task                  String
+  assigneeParticipantId String?
+  assigneeName          String?
+  deadline              String?
+  status                String          @default("open")
+  confidence            Float           @default(1.0)
+  evidenceSegmentIds    Int[]
+  analysis              MeetingAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model MeetingRisk {
+  id                 String          @id @default(cuid())
+  analysisId         String
+  risk               String
+  mitigation         String?
+  evidenceSegmentIds Int[]
+  analysis           MeetingAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model MeetingQuestion {
+  id                 String          @id @default(cuid())
+  analysisId         String
+  question           String
+  evidenceSegmentIds Int[]
+  analysis           MeetingAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId])
+}
+
+model MeetingProcessingJob {
+  id        String   @id @default(cuid())
+  meetingId String
+  jobType   String
+  status    String   @default("pending")
+  attempts  Int      @default(0)
+  error     String?
+  meeting   Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([meetingId, jobType])
+  @@index([status])
 }

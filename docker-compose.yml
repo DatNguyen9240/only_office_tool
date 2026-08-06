@@ -127,7 +127,55 @@ services:
       - "5001:8080"
     restart: unless-stopped
 
+  livekit:
+    image: livekit/livekit-server:v1.6.0
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "7882:7882/udp"
+    restart: unless-stopped
+
+  livekit-egress:
+    image: livekit/egress:v1.8.0
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+    depends_on:
+      - livekit
+    restart: unless-stopped
+
+  analyzer-service:
+    build:
+      context: ./analyzer-service
+      dockerfile: Dockerfile
+    image: meridian-dms-analyzer:latest
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      - NESTJS_API_URL=http://api:3000
+      - S3_ENDPOINT=http://minio:9000
+      - WHISPER_MODEL=${WHISPER_MODEL:-small}
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cpu}
+      - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-int8}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE:-vi}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+    depends_on:
+      - redis
+      - minio-init
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
 volumes:
   redis-data:
   clamav-data:
   elasticsearch-data:
+

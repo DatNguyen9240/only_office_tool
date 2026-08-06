@@ -16,6 +16,8 @@ import { ForgotPasswordPage } from "@/pages/auth/ForgotPasswordPage";
 import { GroupsPage } from "@/pages/admin/GroupsPage";
 import { AssistantPage } from "@/pages/assistant/AssistantPage";
 import { TemplatesPage } from "@/pages/documents/TemplatesPage";
+import { MeetingRoomPage } from "@/pages/meetings/MeetingRoomPage";
+import { MeetingPlaybackPage } from "@/pages/meetings/MeetingPlaybackPage";
 
 export const router = createBrowserRouter([
   {
@@ -29,6 +31,22 @@ export const router = createBrowserRouter([
   { path: "/share/:token", element: <ShareLinkPage /> },
   { path: "/forgot-password", element: <ForgotPasswordPage /> },
   { path: "/reset-password", element: <ForgotPasswordPage /> },
+  {
+    path: "/meetings/:meetingId",
+    element: (
+      <RequireAuth>
+        <MeetingRoomPage />
+      </RequireAuth>
+    ),
+  },
+  {
+    path: "/meetings/:meetingId/playback",
+    element: (
+      <RequireAuth>
+        <MeetingPlaybackPage />
+      </RequireAuth>
+    ),
+  },
   {
     path: "/editor/:id",
     element: (

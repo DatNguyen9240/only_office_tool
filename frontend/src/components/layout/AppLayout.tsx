@@ -9,6 +9,7 @@ import {
   TeamOutlined,
   BulbOutlined,
   FileAddOutlined,
+  VideoCameraOutlined,
 } from "@ant-design/icons";
 import { ProLayout, type ProLayoutProps } from "@ant-design/pro-components";
 import { useMemo } from "react";
@@ -24,7 +25,7 @@ const baseRoute = {
     { path: "/dashboard", name: "Dashboard", icon: <DashboardOutlined /> },
     { path: "/assistant", name: "AI assistant", icon: <BulbOutlined /> },
     { path: "/templates", name: "Templates", icon: <FileAddOutlined /> },
-    { path: "/documents", name: "Documents", icon: <FileTextOutlined /> },
+    { path: "/meetings/demo-room-1", name: "Meetings", icon: <VideoCameraOutlined /> },
     { path: "/shared", name: "Shared with me", icon: <ShareAltOutlined /> },
     { path: "/recent", name: "Recent", icon: <ClockCircleOutlined /> },
     { path: "/favorites", name: "Favorites", icon: <StarOutlined /> },
