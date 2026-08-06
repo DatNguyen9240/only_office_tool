@@ -33,19 +33,11 @@ export const router = createBrowserRouter([
   { path: "/reset-password", element: <ForgotPasswordPage /> },
   {
     path: "/meetings/:meetingId",
-    element: (
-      <RequireAuth>
-        <MeetingRoomPage />
-      </RequireAuth>
-    ),
+    element: <MeetingRoomPage />,
   },
   {
     path: "/meetings/:meetingId/playback",
-    element: (
-      <RequireAuth>
-        <MeetingPlaybackPage />
-      </RequireAuth>
-    ),
+    element: <MeetingPlaybackPage />,
   },
   {
     path: "/editor/:id",
