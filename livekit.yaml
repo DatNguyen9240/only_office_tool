@@ -1,11 +1,11 @@
-port: 30389
+port: 15672
 bind_addresses:
   - ""
 log_level: info
 development: true
 
 rtc:
-  tcp_port: 15672
+  tcp_port: 15673
   udp_port: 7882
   use_external_ip: true
 

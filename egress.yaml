@@ -1,6 +1,6 @@
 api_key: devkey
 api_secret: secret
-ws_url: ws://livekit:30389
+ws_url: ws://livekit:15672
 insecure: true
 redis:
   address: redis:6379
