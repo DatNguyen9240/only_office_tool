@@ -84,7 +84,7 @@ export const MeetingRoomPage: React.FC = () => {
 
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const currentHost = window.location.hostname;
-      const targetServerUrl = (serverUrl || `${wsProtocol}//${currentHost}:7880`)
+      const targetServerUrl = (serverUrl || `${wsProtocol}//${currentHost}:8070`)
         .replace("localhost", currentHost)
         .replace("127.0.0.1", currentHost);
 

@@ -93,7 +93,7 @@ services:
       TIKA_URL: http://tika:9998
       ELASTICSEARCH_URL: http://elasticsearch:9200
       LIVEKIT_URL: http://livekit:7880
-      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://103.190.38.46:7880}
+      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://103.190.38.46:8070}
     depends_on:
       minio-init:
         condition: service_completed_successfully
@@ -135,8 +135,8 @@ services:
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      - "7880:7880"
-      - "7881:7881"
+      - "8070:7880"
+      - "15672:7881"
       - "7882:7882/udp"
     restart: unless-stopped
 

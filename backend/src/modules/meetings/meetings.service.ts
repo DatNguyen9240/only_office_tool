@@ -131,7 +131,7 @@ export class MeetingsService {
 
     const apiKey = this.configService.get<string>("LIVEKIT_API_KEY") || "devkey";
     const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET") || "secret";
-    const publicUrl = this.configService.get<string>("LIVEKIT_PUBLIC_URL") || "ws://localhost:7880";
+    const publicUrl = this.configService.get<string>("LIVEKIT_PUBLIC_URL") || "ws://localhost:8070";
 
     const participantIdentity = dto.participantId || userId;
     const participantName = dto.participantName;
