@@ -85,13 +85,20 @@ export class MeetingsService {
     });
 
     if (!meeting) {
+      const defaultUser = await this.db.user.findFirst({ select: { id: true } });
+      const createData: any = {
+        title: `Cuộc họp ${meetingId}`,
+        roomName: meetingId,
+        status: "LIVE",
+        startedAt: new Date(),
+      };
+
+      if (defaultUser) {
+        createData.createdById = defaultUser.id;
+      }
+
       meeting = await this.db.meeting.create({
-        data: {
-          title: `Cuộc họp ${meetingId}`,
-          roomName: meetingId,
-          status: "LIVE",
-          startedAt: new Date(),
-        },
+        data: createData,
         include: {
           createdBy: { select: { id: true, name: true, email: true } },
           participants: true,
@@ -122,8 +129,8 @@ export class MeetingsService {
   async generateToken(meetingId: string, userId: string, dto: TokenRequestDto) {
     const meeting = await this.getMeeting(meetingId);
 
-    const apiKey = this.configService.getOrThrow<string>("LIVEKIT_API_KEY");
-    const apiSecret = this.configService.getOrThrow<string>("LIVEKIT_API_SECRET");
+    const apiKey = this.configService.get<string>("LIVEKIT_API_KEY") || "devkey";
+    const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET") || "secret";
     const publicUrl = this.configService.get<string>("LIVEKIT_PUBLIC_URL") || "ws://localhost:7880";
 
     const participantIdentity = dto.participantId || userId;
@@ -270,8 +277,8 @@ export class MeetingsService {
   }
 
   async handleWebhook(body: any, authHeader: string) {
-    const apiKey = this.configService.getOrThrow<string>("LIVEKIT_API_KEY");
-    const apiSecret = this.configService.getOrThrow<string>("LIVEKIT_API_SECRET");
+    const apiKey = this.configService.get<string>("LIVEKIT_API_KEY") || "devkey";
+    const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET") || "secret";
 
     let event = body;
     if (authHeader) {
