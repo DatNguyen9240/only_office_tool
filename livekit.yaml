@@ -6,7 +6,7 @@ development: true
 
 rtc:
   node_ip: 103.190.38.46
-  tcp_port: 7881
+  tcp_port: 443
   udp_port: 7882
   use_external_ip: true
 
