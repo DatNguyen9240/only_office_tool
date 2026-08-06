@@ -31,13 +31,11 @@ export class MeetingsController {
     return this.meetingsService.listUserMeetings(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(":meetingId")
   async getMeeting(@Param("meetingId") meetingId: string) {
     return this.meetingsService.getMeeting(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post(":meetingId/token")
   async generateToken(
     @Param("meetingId") meetingId: string,
@@ -48,37 +46,31 @@ export class MeetingsController {
     return this.meetingsService.generateToken(meetingId, userId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post(":meetingId/start-recording")
   async startRecording(@Param("meetingId") meetingId: string) {
     return this.meetingsService.startRecording(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post(":meetingId/stop-recording")
   async stopRecording(@Param("meetingId") meetingId: string) {
     return this.meetingsService.stopRecording(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(":meetingId/playback")
   async getPlayback(@Param("meetingId") meetingId: string) {
     return this.meetingsService.getPlayback(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(":meetingId/transcript")
   async getTranscript(@Param("meetingId") meetingId: string) {
     return this.meetingsService.getTranscript(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get(":meetingId/analysis")
   async getAnalysis(@Param("meetingId") meetingId: string) {
     return this.meetingsService.getAnalysis(meetingId);
   }
 
-  @UseGuards(JwtAuthGuard)
   @Post(":meetingId/reanalyze")
   async reanalyze(@Param("meetingId") meetingId: string) {
     return this.meetingsService.reanalyze(meetingId);

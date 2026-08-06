@@ -65,8 +65,10 @@ export class MeetingsService {
   }
 
   async getMeeting(meetingId: string) {
-    const meeting = await this.db.meeting.findUnique({
-      where: { id: meetingId },
+    let meeting = await this.db.meeting.findFirst({
+      where: {
+        OR: [{ id: meetingId }, { roomName: meetingId }],
+      },
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
         participants: true,
@@ -83,7 +85,19 @@ export class MeetingsService {
     });
 
     if (!meeting) {
-      throw new NotFoundException(`Meeting with ID ${meetingId} not found`);
+      meeting = await this.db.meeting.create({
+        data: {
+          title: `Cuộc họp ${meetingId}`,
+          roomName: meetingId,
+          status: "LIVE",
+          startedAt: new Date(),
+        },
+        include: {
+          createdBy: { select: { id: true, name: true, email: true } },
+          participants: true,
+          recordings: true,
+        },
+      });
     }
 
     return meeting;
