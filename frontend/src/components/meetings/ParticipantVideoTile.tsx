@@ -72,11 +72,7 @@ export const ParticipantVideoTile: React.FC<ParticipantVideoTileProps> = ({ part
     : participant.identity.charAt(0).toUpperCase();
 
   return (
-    <div
-      className={`relative w-full h-full min-h-[220px] bg-slate-900 rounded-xl overflow-hidden border-2 transition-all duration-300 ${
-        isSpeaking ? "border-indigo-500 shadow-lg shadow-indigo-500/20 is-speaking" : "border-slate-800"
-      }`}
-    >
+    <div className={`participant-tile ${isSpeaking ? "is-speaking" : ""}`}>
       {!participant.isLocal && <audio ref={audioRef} autoPlay />}
 
       <video
@@ -84,34 +80,35 @@ export const ParticipantVideoTile: React.FC<ParticipantVideoTileProps> = ({ part
         autoPlay
         playsInline
         muted={participant.isLocal}
-        className={`w-full h-full object-cover ${hasVideo ? "block" : "hidden"}`}
+        className="participant-video-el"
+        style={{ display: hasVideo ? "block" : "none" }}
       />
 
       {!hasVideo && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-850">
-          <div className="w-20 h-20 rounded-full bg-indigo-600/30 border border-indigo-400/40 flex items-center justify-center text-white text-2xl font-bold mb-2 shadow-inner">
-            {nameInitial || <UserOutlined style={{ fontSize: 32 }} />}
+        <div className="participant-avatar-overlay">
+          <div className="participant-avatar-circle">
+            {nameInitial || <UserOutlined />}
           </div>
-          <span className="text-slate-300 text-sm font-medium">
+          <div className="participant-avatar-name">
             {participant.name || participant.identity}
-          </span>
+          </div>
         </div>
       )}
 
-      {/* Participant Label & Waveform Overlay Bottom Bar */}
-      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent p-3 flex items-center justify-between">
-        <div className="flex items-center gap-2 max-w-[65%]">
-          <span className="text-white text-xs font-semibold truncate">
+      {/* Participant Label & Waveform Overlay */}
+      <div className="participant-bottom-bar">
+        <div className="participant-name-tag">
+          <span>
             {participant.name || participant.identity} {participant.isLocal ? "(Bạn)" : ""}
           </span>
           {isMuted ? (
-            <AudioMutedOutlined className="text-red-400 shrink-0" />
+            <AudioMutedOutlined style={{ color: "#f87171" }} />
           ) : (
-            <AudioOutlined className="text-emerald-400 shrink-0" />
+            <AudioOutlined style={{ color: "#34d399" }} />
           )}
         </div>
 
-        <div className="flex items-center">
+        <div style={{ display: "flex", alignItems: "center" }}>
           <ParticipantAudioVisualizer track={audioTrack} isMuted={isMuted} />
         </div>
       </div>

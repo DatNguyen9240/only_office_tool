@@ -151,30 +151,36 @@ export const MeetingRoomPage: React.FC = () => {
 
   if (!joined) {
     return (
-      <div className="w-full h-screen bg-slate-950 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
+      <div className="meeting-join-overlay">
+        <div className="meeting-join-card">
+          <div className="meeting-join-icon">
             <VideoCameraOutlined style={{ fontSize: 32 }} />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white">Tham gia Cuộc họp Trực tuyến</h2>
-            <p className="text-slate-400 text-xs mt-1">Mã phòng: {meetingId}</p>
+            <h2 className="meeting-join-title">Tham gia Cuộc họp Trực tuyến</h2>
+            <p className="meeting-join-subtitle">Mã phòng: {meetingId}</p>
           </div>
 
-          <div className="text-left space-y-2">
-            <label className="text-xs font-semibold text-slate-300">Tên hiển thị của bạn</label>
+          <div>
+            <label className="meeting-join-input-label">Tên hiển thị của bạn</label>
             <Input
               value={participantName}
               onChange={(e) => setParticipantName(e.target.value)}
               placeholder="Nhập tên của bạn..."
-              className="h-11 bg-slate-950 border-slate-800 text-white rounded-xl"
+              style={{
+                height: 44,
+                backgroundColor: "#0b0f19",
+                borderColor: "#374151",
+                color: "#ffffff",
+                borderRadius: 12,
+              }}
             />
           </div>
 
           <button
             onClick={handleJoin}
             disabled={connecting || !participantName.trim()}
-            className="w-full h-12 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="meeting-join-btn"
           >
             {connecting ? (
               <>
@@ -191,7 +197,7 @@ export const MeetingRoomPage: React.FC = () => {
   }
 
   return (
-    <div className="w-full h-screen bg-slate-950 flex flex-col overflow-hidden">
+    <div className="meeting-page-container">
       <MeetingGrid participants={participants} />
 
       <MeetingControlBar
