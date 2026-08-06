@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Room, RoomEvent, Participant } from "livekit-client";
+import { Room, RoomEvent, Participant, TrackPublication } from "livekit-client";
 import { MeetingGrid } from "../../components/meetings/MeetingGrid";
 import { MeetingControlBar } from "../../components/meetings/MeetingControlBar";
 import { Spin, notification, Input } from "antd";
@@ -66,15 +66,10 @@ export const MeetingRoomPage: React.FC = () => {
       let nameToUse = participantName.trim();
 
       if (user) {
-        participantId = user.id;
+        participantId = `${user.id}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         nameToUse = user.name || user.email.split("@")[0];
       } else {
-        let storedId = sessionStorage.getItem("meeting_participant_id");
-        if (!storedId) {
-          storedId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-          sessionStorage.setItem("meeting_participant_id", storedId);
-        }
-        participantId = storedId;
+        participantId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       }
 
       const { token, serverUrl } = await apiRequest<{ token: string; serverUrl: string }>(
@@ -174,8 +169,26 @@ export const MeetingRoomPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (room) {
+        room.localParticipant.getTrackPublications().forEach((publication: TrackPublication) => {
+          if (publication.track) {
+            publication.track.stop();
+          }
+        });
+        room.disconnect();
+      }
+    };
+  }, [room]);
+
   const handleLeave = () => {
     if (room) {
+      room.localParticipant.getTrackPublications().forEach((publication: TrackPublication) => {
+        if (publication.track) {
+          publication.track.stop();
+        }
+      });
       room.disconnect();
     }
     navigate(`/meetings/${meetingId}/playback`);

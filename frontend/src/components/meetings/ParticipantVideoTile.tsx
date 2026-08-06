@@ -60,6 +60,12 @@ export const ParticipantVideoTile: React.FC<ParticipantVideoTileProps> = ({ part
     participant.on("connectionQualityChanged", (quality) => setConnectionQuality(quality));
 
     return () => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
+      if (audioRef.current) {
+        audioRef.current.srcObject = null;
+      }
       participant.off("trackSubscribed", updateState);
       participant.off("trackUnsubscribed", updateState);
       participant.off("trackMuted", updateState);
