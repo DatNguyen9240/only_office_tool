@@ -1,4 +1,4 @@
-port: 15672
+port: 7880
 bind_addresses:
   - ""
 log_level: info

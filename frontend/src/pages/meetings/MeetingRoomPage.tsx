@@ -85,7 +85,7 @@ export const MeetingRoomPage: React.FC = () => {
 
       const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
       const currentHost = window.location.hostname;
-      const targetServerUrl = serverUrl || `${wsProtocol}//${currentHost}:15672`;
+      const targetServerUrl = serverUrl || `${wsProtocol}//${currentHost}:7880`;
 
       await activeRoom.connect(targetServerUrl, token);
       setRoom(activeRoom);
