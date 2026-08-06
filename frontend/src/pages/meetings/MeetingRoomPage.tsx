@@ -5,15 +5,23 @@ import { MeetingGrid } from "../../components/meetings/MeetingGrid";
 import { MeetingControlBar } from "../../components/meetings/MeetingControlBar";
 import { Spin, notification, Input } from "antd";
 import { VideoCameraOutlined } from "@ant-design/icons";
+import { useAuthStore } from "@/store/useAuthStore";
+import { apiRequest } from "@/lib/api";
+
+import anonymousNames from "@/data/anonymousNames.json";
 
 export const MeetingRoomPage: React.FC = () => {
   const { meetingId } = useParams<{ meetingId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   const [room, setRoom] = useState<Room | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [connecting, setConnecting] = useState<boolean>(false);
-  const [participantName, setParticipantName] = useState<string>("Thành viên");
+  const [participantName, setParticipantName] = useState<string>(() => {
+    const randomIndex = Math.floor(Math.random() * anonymousNames.length);
+    return anonymousNames[randomIndex];
+  });
   const [joined, setJoined] = useState<boolean>(false);
   const [isMicOn, setIsMicOn] = useState<boolean>(true);
   const [isCamOn, setIsCamOn] = useState<boolean>(true);
@@ -24,6 +32,21 @@ export const MeetingRoomPage: React.FC = () => {
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedAudioId, setSelectedAudioId] = useState<string>("");
   const [selectedVideoId, setSelectedVideoId] = useState<string>("");
+
+  useEffect(() => {
+    if (user) {
+      const displayName = user.name || user.email.split("@")[0];
+      setParticipantName(displayName);
+    } else {
+      let storedName = sessionStorage.getItem("meeting_anonymous_name");
+      if (!storedName) {
+        const randomIndex = Math.floor(Math.random() * anonymousNames.length);
+        storedName = anonymousNames[randomIndex];
+        sessionStorage.setItem("meeting_anonymous_name", storedName);
+      }
+      setParticipantName(storedName);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
@@ -39,17 +62,28 @@ export const MeetingRoomPage: React.FC = () => {
     setConnecting(true);
 
     try {
-      const res = await fetch(`/api/meetings/${meetingId}/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantName }),
-      });
+      let participantId: string;
+      let nameToUse = participantName.trim();
 
-      if (!res.ok) {
-        throw new Error("Không thể lấy Token cuộc họp từ backend");
+      if (user) {
+        participantId = user.id;
+        nameToUse = user.name || user.email.split("@")[0];
+      } else {
+        let storedId = sessionStorage.getItem("meeting_participant_id");
+        if (!storedId) {
+          storedId = `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+          sessionStorage.setItem("meeting_participant_id", storedId);
+        }
+        participantId = storedId;
       }
 
-      const { token, serverUrl } = await res.json();
+      const { token, serverUrl } = await apiRequest<{ token: string; serverUrl: string }>(
+        `/meetings/${meetingId}/token`,
+        {
+          method: "POST",
+          body: JSON.stringify({ participantName: nameToUse, participantId }),
+        }
+      );
 
       const activeRoom = new Room({
         adaptiveStream: true,
@@ -126,17 +160,15 @@ export const MeetingRoomPage: React.FC = () => {
   const toggleRecording = async () => {
     if (!meetingId) return;
     try {
-      const endpoint = isRecording
-        ? `/api/meetings/${meetingId}/stop-recording`
-        : `/api/meetings/${meetingId}/start-recording`;
+      const path = isRecording
+        ? `/meetings/${meetingId}/stop-recording`
+        : `/meetings/${meetingId}/start-recording`;
 
-      const res = await fetch(endpoint, { method: "POST" });
-      if (res.ok) {
-        setIsRecording(!isRecording);
-        notification.success({
-          message: isRecording ? "Đã dừng ghi hình" : "Đã bắt đầu ghi hình cuộc họp",
-        });
-      }
+      await apiRequest(path, { method: "POST" });
+      setIsRecording(!isRecording);
+      notification.success({
+        message: isRecording ? "Đã dừng ghi hình" : "Đã bắt đầu ghi hình cuộc họp",
+      });
     } catch (err) {
       notification.error({ message: "Lỗi thao tác ghi hình" });
     }

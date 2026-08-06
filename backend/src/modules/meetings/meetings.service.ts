@@ -133,8 +133,32 @@ export class MeetingsService {
     const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET") || "secret";
     const publicUrl = this.configService.get<string>("LIVEKIT_PUBLIC_URL") || "ws://localhost:7880";
 
-    const participantIdentity = dto.participantId || userId;
-    const participantName = dto.participantName;
+    const uniqueId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const participantIdentity =
+      dto.participantId || (userId && userId !== "anonymous" ? userId : uniqueId);
+
+    const animalNames = [
+      "Thỏ Tinh Tinh 🐰",
+      "Cáo Tinh Anh 🦊",
+      "Hổ Dũng Mãn 🐯",
+      "Sư Tử Dũng Cảm 🦁",
+      "Gấu Nâu Ấm Áp 🐻",
+      "Đại Bàng Tinh Anh 🦅",
+      "Mèo Thùy Mị 🐱",
+      "Chó Búp Bê 🐶",
+      "Sóc Nhanh Nhẹn 🐿️",
+      "Cá Heo Thông Minh 🐬",
+      "Chim Cánh Cụt Dễ Thương 🐧",
+      "Hươu Cao Cổ 🦒",
+      "Voi Tinh Tấn 🐘",
+      "Tê Giác Kiên Cường 🦏",
+      "Gấu Trúc Đáng Yêu 🐼",
+      "Sói Đầu Đàn 🐺",
+      "Ngựa Phong Sương 🐴",
+      "Rồng Uy Nghi 🐉"
+    ];
+    const randomAnimal = animalNames[Math.floor(Math.random() * animalNames.length)];
+    const participantName = dto.participantName || randomAnimal;
 
     const at = new AccessToken(apiKey, apiSecret, {
       identity: participantIdentity,
