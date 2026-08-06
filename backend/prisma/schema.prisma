@@ -428,21 +428,6 @@ model AuditLog {
   actorId      String?
   action       String
   resourceType String
-  expiresAt  DateTime?
-  createdById String
-  document   Document       @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  createdAt  DateTime       @default(now())
-  revokedAt  DateTime?
-
-  @@index([documentId])
-}
-
-model AuditLog {
-  id           String   @id @default(cuid())
-  timestamp    DateTime @default(now())
-  actorId      String?
-  action       String
-  resourceType String
   resourceId   String?
   outcome      String
   ip           String?
