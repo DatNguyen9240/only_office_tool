@@ -93,7 +93,7 @@ services:
       TIKA_URL: http://tika:9998
       ELASTICSEARCH_URL: http://elasticsearch:9200
       LIVEKIT_URL: http://livekit:7880
-      LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://103.190.38.46:7880}
+      LIVEKIT_PUBLIC_URL: ws://103.190.38.46:7880
     depends_on:
       minio-init:
         condition: service_completed_successfully
