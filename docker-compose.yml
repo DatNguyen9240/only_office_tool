@@ -173,7 +173,7 @@ services:
       - redis
       - minio-init
     ports:
-      - "8000:8000"
+      - "8008:8000"
     restart: unless-stopped
 
 volumes:
