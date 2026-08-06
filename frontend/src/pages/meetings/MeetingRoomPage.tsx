@@ -82,7 +82,13 @@ export const MeetingRoomPage: React.FC = () => {
         .on(RoomEvent.TrackMuted, updateParticipants)
         .on(RoomEvent.TrackUnmuted, updateParticipants);
 
-      await activeRoom.connect(serverUrl || "ws://localhost:7880", token);
+      const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const currentHost = window.location.hostname;
+      const targetServerUrl = (serverUrl || `${wsProtocol}//${currentHost}:7880`)
+        .replace("localhost", currentHost)
+        .replace("127.0.0.1", currentHost);
+
+      await activeRoom.connect(targetServerUrl, token);
       setRoom(activeRoom);
     } catch (err: any) {
       setConnecting(false);
