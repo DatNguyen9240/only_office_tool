@@ -92,7 +92,7 @@ services:
       MALWARE_SCAN_REQUIRED: "true"
       TIKA_URL: http://tika:9998
       ELASTICSEARCH_URL: http://elasticsearch:9200
-      LIVEKIT_URL: http://livekit:30389
+      LIVEKIT_URL: http://livekit:7880
       LIVEKIT_PUBLIC_URL: ${LIVEKIT_PUBLIC_URL:-ws://103.190.38.46:30389}
     depends_on:
       minio-init:
@@ -135,7 +135,7 @@ services:
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      - "30389:30389"
+      - "30389:7880"
       - "15672:15672"
       - "7882:7882/udp"
     restart: unless-stopped
