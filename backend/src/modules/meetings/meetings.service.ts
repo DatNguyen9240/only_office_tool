@@ -417,6 +417,9 @@ export class MeetingsService {
         };
       }
     } catch (err: any) {
+      if (err.name === "NotFound" || err.name === "NoSuchKey" || err.$metadata?.httpStatusCode === 404) {
+        throw new NotFoundException("Video file not found in storage");
+      }
       this.logger.error(`Error fetching video stream for ${meetingId}: ${err.message}`);
       throw new InternalServerErrorException(`Could not stream video: ${err.message}`);
     }
