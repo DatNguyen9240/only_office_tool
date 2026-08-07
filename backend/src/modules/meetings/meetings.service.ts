@@ -34,10 +34,10 @@ export class MeetingsService {
     private readonly storageService: StorageService,
   ) {
     const livekitHost = this.configService.get<string>("LIVEKIT_URL");
-    const apiKey = this.configService.get<string>("LIVEKIT_API_KEY");
-    const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET");
+    const apiKey = this.configService.get<string>("LIVEKIT_API_KEY") || "devkey";
+    const apiSecret = this.configService.get<string>("LIVEKIT_API_SECRET") || "secret";
 
-    if (livekitHost && apiKey && apiSecret) {
+    if (livekitHost) {
       try {
         this.egressClient = new EgressClient(livekitHost, apiKey, apiSecret);
       } catch (err) {

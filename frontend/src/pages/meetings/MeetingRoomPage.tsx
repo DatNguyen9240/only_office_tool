@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Room, RoomEvent, Participant, TrackPublication } from "livekit-client";
 import { MeetingGrid } from "../../components/meetings/MeetingGrid";
 import { MeetingControlBar } from "../../components/meetings/MeetingControlBar";
-import { Spin, notification, Input } from "antd";
+import { Spin, App, Input } from "antd";
 import { VideoCameraOutlined } from "@ant-design/icons";
 import { useAuthStore } from "@/store/useAuthStore";
 import { apiRequest } from "@/lib/api";
@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/api";
 import anonymousNames from "@/data/anonymousNames.json";
 
 export const MeetingRoomPage: React.FC = () => {
+  const { notification } = App.useApp();
   const { meetingId } = useParams<{ meetingId: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -164,8 +165,11 @@ export const MeetingRoomPage: React.FC = () => {
       notification.success({
         message: isRecording ? "Đã dừng ghi hình" : "Đã bắt đầu ghi hình cuộc họp",
       });
-    } catch (err) {
-      notification.error({ message: "Lỗi thao tác ghi hình" });
+    } catch (err: any) {
+      notification.error({
+        message: "Lỗi thao tác ghi hình",
+        description: err.message || "Đã xảy ra lỗi không xác định",
+      });
     }
   };
 

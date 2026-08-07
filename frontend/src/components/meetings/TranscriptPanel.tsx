@@ -51,35 +51,31 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md">
-      <div className="p-4 border-b border-slate-800 flex items-center justify-between gap-3 bg-slate-900/90">
-        <div className="flex-1">
+    <div className="transcript-panel-card">
+      <div className="transcript-header">
+        <div className="transcript-search-box">
           <Input
-            prefix={<SearchOutlined className="text-slate-400 mr-1" />}
+            prefix={<SearchOutlined className="transcript-search-icon" />}
             placeholder="Tìm kiếm nội dung transcript..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             allowClear
-            className="bg-slate-950 border-slate-800 text-white hover:border-indigo-500 focus:border-indigo-500 rounded-lg"
+            className="transcript-search-input"
           />
         </div>
         <button
           onClick={() => setAutoScroll(!autoScroll)}
           title="Tự động cuộn theo video"
-          className={`p-2 rounded-lg text-xs font-medium flex items-center gap-1 transition-all ${
-            autoScroll
-              ? "bg-indigo-600/20 text-indigo-400 border border-indigo-500/30"
-              : "bg-slate-800 text-slate-400 hover:text-white"
-          }`}
+          className={`transcript-autoscroll-btn ${autoScroll ? "active" : ""}`}
         >
           <DownCircleOutlined />
           Auto-scroll
         </button>
       </div>
 
-      <div ref={listContainerRef} className="flex-1 p-3 overflow-y-auto space-y-2">
+      <div ref={listContainerRef} className="transcript-list-container">
         {filteredSegments.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">
+          <div className="transcript-empty-state">
             Không tìm thấy đoạn hội thoại nào phù hợp.
           </div>
         ) : (
@@ -91,18 +87,14 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                 key={seg.id || idx}
                 ref={isActive ? activeRowRef : null}
                 onClick={() => onSegmentClick(seg.startTime)}
-                className={`p-3 rounded-lg border transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-indigo-950/40 border-indigo-500/60 text-white shadow-sm"
-                    : "bg-slate-950/40 border-slate-800/80 hover:border-slate-700 text-slate-300"
-                }`}
+                className={`transcript-segment-item ${isActive ? "active" : ""}`}
               >
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400">
+                <div className="transcript-segment-top">
+                  <div className="transcript-speaker-tag">
                     <UserOutlined />
                     <span>{seg.participantName}</span>
                   </div>
-                  <div className="flex items-center gap-1 text-[11px] font-mono text-slate-500">
+                  <div className="transcript-time-tag">
                     <ClockCircleOutlined />
                     <span>
                       {formatTime(seg.startTime)} - {formatTime(seg.endTime)}
@@ -110,7 +102,7 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
                   </div>
                 </div>
 
-                <p className="text-sm leading-relaxed">{seg.text}</p>
+                <p className="transcript-segment-text">{seg.text}</p>
               </div>
             );
           })
@@ -119,3 +111,4 @@ export const TranscriptPanel: React.FC<TranscriptPanelProps> = ({
     </div>
   );
 };
+

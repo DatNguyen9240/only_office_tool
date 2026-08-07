@@ -119,25 +119,22 @@ export const MeetingWaveform: React.FC<MeetingWaveformProps> = ({
   };
 
   return (
-    <div className="w-full bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3 shadow-md">
-      <div ref={containerRef} className="w-full cursor-pointer rounded overflow-hidden" />
+    <div className="waveform-card">
+      <div ref={containerRef} className="waveform-canvas-container" />
 
-      <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={togglePlay}
-            className="p-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center justify-center"
-          >
+      <div className="waveform-controls">
+        <div className="waveform-controls-left">
+          <button onClick={togglePlay} className="waveform-play-btn">
             {isPlaying ? <PauseOutlined style={{ fontSize: 16 }} /> : <CaretRightOutlined style={{ fontSize: 16 }} />}
           </button>
-          <span className="text-xs font-mono text-slate-300">
+          <span className="waveform-time-display">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 w-32">
-            <button onClick={toggleMute} className="text-slate-400 hover:text-white">
+        <div className="waveform-controls-right">
+          <div className="waveform-volume-box">
+            <button onClick={toggleMute} className="waveform-icon-btn">
               {isMuted ? <MutedOutlined /> : <SoundOutlined />}
             </button>
             <Slider
@@ -146,21 +143,15 @@ export const MeetingWaveform: React.FC<MeetingWaveformProps> = ({
               step={0.05}
               value={isMuted ? 0 : volume}
               onChange={handleVolumeChange}
-              className="flex-1"
+              className="waveform-volume-slider"
             />
           </div>
 
-          <div className="flex items-center gap-1 border-l border-slate-800 pl-3">
-            <button
-              onClick={() => handleZoom(-15)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
-            >
+          <div className="waveform-zoom-box">
+            <button onClick={() => handleZoom(-15)} className="waveform-icon-btn">
               <ZoomOutOutlined />
             </button>
-            <button
-              onClick={() => handleZoom(15)}
-              className="p-1.5 rounded hover:bg-slate-800 text-slate-400 hover:text-white"
-            >
+            <button onClick={() => handleZoom(15)} className="waveform-icon-btn">
               <ZoomInOutlined />
             </button>
           </div>
@@ -169,3 +160,4 @@ export const MeetingWaveform: React.FC<MeetingWaveformProps> = ({
     </div>
   );
 };
+

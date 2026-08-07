@@ -4,7 +4,7 @@ import { MeetingPlaybackResponse, TranscriptSegment, MeetingAnalysis } from "@sh
 import { MeetingWaveform } from "../../components/meetings/MeetingWaveform";
 import { TranscriptPanel } from "../../components/meetings/TranscriptPanel";
 import { MeetingSummaryPanel } from "../../components/meetings/MeetingSummaryPanel";
-import { Spin, Tabs, Button, notification, Tag } from "antd";
+import { Spin, Tabs, Button, App, Tag } from "antd";
 import {
   VideoCameraOutlined,
   ReloadOutlined,
@@ -14,6 +14,7 @@ import {
 } from "@ant-design/icons";
 
 export const MeetingPlaybackPage: React.FC = () => {
+  const { notification } = App.useApp();
   const { meetingId } = useParams<{ meetingId: string }>();
   const navigate = useNavigate();
 
@@ -106,43 +107,43 @@ export const MeetingPlaybackPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="w-full h-screen bg-slate-950 flex flex-col items-center justify-center gap-3 text-slate-400">
+      <div className="playback-loading-overlay">
         <Spin size="large" />
-        <span className="text-sm font-medium">Đang tải bản xem lại cuộc họp...</span>
+        <span className="playback-loading-text">Đang tải bản xem lại cuộc họp...</span>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-screen bg-slate-950 flex flex-col overflow-hidden text-slate-200">
+    <div className="playback-page-container">
       {/* Header */}
-      <div className="px-6 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
+      <div className="playback-header">
+        <div className="playback-header-left">
           <Button
             type="text"
-            icon={<ArrowLeftOutlined className="text-slate-400" />}
+            icon={<ArrowLeftOutlined className="playback-back-icon" />}
             onClick={() => navigate("/documents")}
-            className="hover:bg-slate-800 text-slate-300"
+            className="playback-back-btn"
           />
           <div>
-            <h1 className="text-base font-bold text-white leading-tight">
+            <h1 className="playback-title">
               {playbackData?.title || "Xem lại cuộc họp"}
             </h1>
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-slate-400">ID: {meetingId}</span>
-              <Tag color="indigo" className="text-[10px] uppercase font-bold">
+            <div className="playback-meta">
+              <span className="playback-id">ID: {meetingId}</span>
+              <Tag color="indigo" className="playback-status-tag">
                 {playbackData?.analysisStatus || "COMPLETED"}
               </Tag>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="playback-header-right">
           <Button
             icon={<ReloadOutlined spin={reanalyzing} />}
             onClick={handleReanalyze}
             loading={reanalyzing}
-            className="bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+            className="playback-reanalyze-btn"
           >
             Phân tích lại LLM
           </Button>
@@ -150,7 +151,7 @@ export const MeetingPlaybackPage: React.FC = () => {
             type="primary"
             icon={<VideoCameraOutlined />}
             onClick={() => navigate(`/meetings/${meetingId}`)}
-            className="bg-indigo-600 hover:bg-indigo-500 font-medium"
+            className="playback-rejoin-btn"
           >
             Vào lại phòng họp
           </Button>
@@ -158,25 +159,23 @@ export const MeetingPlaybackPage: React.FC = () => {
       </div>
 
       {/* Main Grid Content */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 overflow-hidden">
-        {/* Left Side: Video & Waveform (7 cols) */}
-        <div className="lg:col-span-7 flex flex-col gap-4 overflow-y-auto">
+      <div className="playback-main-grid">
+        {/* Left Side: Video & Waveform */}
+        <div className="playback-left-column">
           {/* HTML5 Video Player */}
-          <div className="w-full bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl aspect-video relative flex items-center justify-center">
+          <div className="playback-video-card">
             {playbackData?.videoUrl ? (
               <video
                 ref={videoRef}
                 src={playbackData.videoUrl}
                 controls
                 onTimeUpdate={handleVideoTimeUpdate}
-                className="w-full h-full object-contain"
+                className="playback-video-element"
               />
             ) : (
-              <div className="flex flex-col items-center gap-2 text-slate-500 p-8 text-center">
-                <Spin />
-                <span className="text-sm font-medium">
-                  Video cuộc họp đang được xử lý hoặc lưu trên MinIO S3...
-                </span>
+              <div className="playback-video-placeholder">
+                <Spin size="large" />
+                <span>Video cuộc họp đang được xử lý hoặc lưu trên MinIO S3...</span>
               </div>
             )}
           </div>
@@ -190,16 +189,16 @@ export const MeetingPlaybackPage: React.FC = () => {
           />
         </div>
 
-        {/* Right Side: Transcript & Analysis Panels (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col h-full overflow-hidden">
+        {/* Right Side: Transcript & Analysis Panels */}
+        <div className="playback-right-column">
           <Tabs
             defaultActiveKey="transcript"
-            className="h-full flex flex-col meetings-tabs"
+            className="playback-tabs"
             items={[
               {
                 key: "transcript",
                 label: (
-                  <span className="flex items-center gap-1.5 px-2">
+                  <span className="playback-tab-label">
                     <AudioOutlined />
                     Transcript ({segments.length})
                   </span>
@@ -215,8 +214,8 @@ export const MeetingPlaybackPage: React.FC = () => {
               {
                 key: "analysis",
                 label: (
-                  <span className="flex items-center gap-1.5 px-2">
-                    <ThunderboltOutlined className="text-indigo-400" />
+                  <span className="playback-tab-label">
+                    <ThunderboltOutlined className="playback-tab-icon-accent" />
                     Phân tích LLM
                   </span>
                 ),
@@ -226,8 +225,9 @@ export const MeetingPlaybackPage: React.FC = () => {
                     onEvidenceClick={handleEvidenceClick}
                   />
                 ) : (
-                  <div className="p-8 text-center text-slate-500">
-                    Đang tải phân tích LLM...
+                  <div className="playback-analysis-loading">
+                    <Spin />
+                    <span>Đang tải phân tích LLM...</span>
                   </div>
                 ),
               },
@@ -238,3 +238,4 @@ export const MeetingPlaybackPage: React.FC = () => {
     </div>
   );
 };
+

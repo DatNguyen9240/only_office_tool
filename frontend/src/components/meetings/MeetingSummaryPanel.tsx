@@ -22,28 +22,28 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
   onEvidenceClick,
 }) => {
   return (
-    <div className="flex flex-col h-full bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-4 space-y-6 overflow-y-auto">
+    <div className="summary-panel-card">
       {/* Title & Summary */}
-      <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-        <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-          <FileTextOutlined className="text-indigo-400" />
+      <div className="summary-section summary-hero">
+        <h3 className="summary-section-title">
+          <FileTextOutlined className="summary-icon-accent" />
           {analysis.title || "Tóm tắt cuộc họp"}
         </h3>
-        <p className="text-slate-300 text-sm leading-relaxed">{analysis.summary}</p>
+        <p className="summary-hero-text">{analysis.summary}</p>
       </div>
 
       {/* Topics */}
       {analysis.topics && analysis.topics.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-            <TagOutlined className="text-indigo-400" />
+        <div className="summary-section">
+          <h4 className="summary-heading">
+            <TagOutlined className="summary-heading-icon" />
             Chủ đề chính
           </h4>
-          <div className="grid gap-2">
+          <div className="summary-grid">
             {analysis.topics.map((t, idx) => (
-              <div key={idx} className="bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-                <span className="text-sm font-semibold text-white block mb-1">{t.title}</span>
-                <span className="text-xs text-slate-400">{t.summary}</span>
+              <div key={idx} className="summary-item-card">
+                <span className="summary-item-title">{t.title}</span>
+                <span className="summary-item-desc">{t.summary}</span>
               </div>
             ))}
           </div>
@@ -52,23 +52,23 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
 
       {/* Decisions */}
       {analysis.decisions && analysis.decisions.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+        <div className="summary-section">
+          <h4 className="summary-heading emerald">
             <CheckCircleOutlined />
             Quyết định ({analysis.decisions.length})
           </h4>
-          <div className="space-y-2">
+          <div className="summary-grid">
             {analysis.decisions.map((d) => (
-              <div key={d.id} className="bg-emerald-950/20 border border-emerald-800/40 p-3 rounded-lg">
-                <p className="text-sm text-emerald-200 font-medium mb-2">{d.content}</p>
+              <div key={d.id} className="summary-item-card decision">
+                <p className="summary-decision-text">{d.content}</p>
                 {d.evidenceSegmentIds && d.evidenceSegmentIds.length > 0 && (
-                  <div className="flex items-center gap-1 text-[11px] text-emerald-400">
+                  <div className="summary-evidence-row">
                     <span>Bằng chứng segment:</span>
                     {d.evidenceSegmentIds.map((segId) => (
                       <AntTag
                         key={segId}
                         color="cyan"
-                        className="cursor-pointer hover:opacity-80"
+                        className="summary-tag-clickable"
                         onClick={() => onEvidenceClick(segId)}
                       >
                         #{segId}
@@ -84,25 +84,25 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
 
       {/* Action Items */}
       {analysis.actionItems && analysis.actionItems.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+        <div className="summary-section">
+          <h4 className="summary-heading indigo">
             <CheckSquareOutlined />
             Công việc cần làm ({analysis.actionItems.length})
           </h4>
-          <div className="space-y-2">
+          <div className="summary-grid">
             {analysis.actionItems.map((act) => (
-              <div key={act.id} className="bg-slate-950/60 border border-slate-800 p-3 rounded-lg">
-                <p className="text-sm text-white font-medium mb-2">{act.task}</p>
-                <div className="flex items-center justify-between text-xs text-slate-400">
-                  <div className="flex items-center gap-2">
+              <div key={act.id} className="summary-item-card action">
+                <p className="summary-action-task">{act.task}</p>
+                <div className="summary-action-meta">
+                  <div className="summary-action-assignee">
                     {act.assigneeName && (
-                      <span className="flex items-center gap-1 text-slate-300">
-                        <UserOutlined className="text-indigo-400" />
+                      <span className="summary-meta-item">
+                        <UserOutlined className="summary-icon-accent" />
                         {act.assigneeName}
                       </span>
                     )}
                     {act.deadline && (
-                      <span className="flex items-center gap-1 text-slate-400">
+                      <span className="summary-meta-item">
                         <CalendarOutlined />
                         {act.deadline}
                       </span>
@@ -111,7 +111,7 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
                   {act.evidenceSegmentIds && act.evidenceSegmentIds.length > 0 && (
                     <AntTag
                       color="blue"
-                      className="cursor-pointer"
+                      className="summary-tag-clickable"
                       onClick={() => onEvidenceClick(act.evidenceSegmentIds[0])}
                     >
                       Bằng chứng #{act.evidenceSegmentIds[0]}
@@ -126,17 +126,17 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
 
       {/* Risks */}
       {analysis.risks && analysis.risks.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+        <div className="summary-section">
+          <h4 className="summary-heading amber">
             <WarningOutlined />
             Rủi ro & Thách thức
           </h4>
-          <div className="space-y-2">
+          <div className="summary-grid">
             {analysis.risks.map((r) => (
-              <div key={r.id} className="bg-amber-950/20 border border-amber-800/40 p-3 rounded-lg">
-                <p className="text-sm text-amber-200 font-medium">{r.risk}</p>
+              <div key={r.id} className="summary-item-card risk">
+                <p className="summary-risk-title">{r.risk}</p>
                 {r.mitigation && (
-                  <p className="text-xs text-amber-400/80 mt-1">Giải pháp: {r.mitigation}</p>
+                  <p className="summary-risk-mitigation">Giải pháp: {r.mitigation}</p>
                 )}
               </div>
             ))}
@@ -146,15 +146,15 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
 
       {/* Unanswered Questions */}
       {analysis.unansweredQuestions && analysis.unansweredQuestions.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+        <div className="summary-section">
+          <h4 className="summary-heading purple">
             <QuestionCircleOutlined />
             Câu hỏi chưa giải quyết
           </h4>
-          <div className="space-y-2">
+          <div className="summary-grid">
             {analysis.unansweredQuestions.map((q) => (
-              <div key={q.id} className="bg-purple-950/20 border border-purple-800/40 p-3 rounded-lg">
-                <p className="text-sm text-purple-200">{q.question}</p>
+              <div key={q.id} className="summary-item-card question">
+                <p className="summary-question-text">{q.question}</p>
               </div>
             ))}
           </div>
@@ -163,3 +163,4 @@ export const MeetingSummaryPanel: React.FC<MeetingSummaryPanelProps> = ({
     </div>
   );
 };
+
