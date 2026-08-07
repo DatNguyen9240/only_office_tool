@@ -4,3 +4,10 @@ ws_url: ws://livekit:7880
 insecure: true
 redis:
   address: redis:6379
+
+s3:
+  access_key: minio
+  secret_key: 50e47f92815204d97a8daf8c2a17883761b5ae37068c01fcb4fdb3a902e982e0
+  endpoint: http://minio:9000
+  bucket: meridian-documents
+  force_path_style: true
