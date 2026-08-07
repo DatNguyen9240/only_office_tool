@@ -102,9 +102,19 @@ export const MeetingRoomPage: React.FC = () => {
           updateParticipants();
           setJoined(true);
           setConnecting(false);
-          // Enable devices asynchronously without blocking connection
-          activeRoom.localParticipant.setMicrophoneEnabled(true).catch(console.warn);
-          activeRoom.localParticipant.setCameraEnabled(true).catch(console.warn);
+          // Enable devices asynchronously if available
+          if (audioDevices.length > 0) {
+            activeRoom.localParticipant.setMicrophoneEnabled(true).catch(console.warn);
+            setIsMicOn(true);
+          } else {
+            setIsMicOn(false);
+          }
+          if (videoDevices.length > 0) {
+            activeRoom.localParticipant.setCameraEnabled(true).catch(console.warn);
+            setIsCamOn(true);
+          } else {
+            setIsCamOn(false);
+          }
         })
         .on(RoomEvent.ParticipantConnected, updateParticipants)
         .on(RoomEvent.ParticipantDisconnected, updateParticipants)
