@@ -10,5 +10,8 @@ rtc:
   udp_port: 7882
   use_external_ip: true
 
+redis:
+  address: redis:6379
+
 keys:
   devkey: secret
