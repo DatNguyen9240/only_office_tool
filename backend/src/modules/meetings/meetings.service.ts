@@ -359,12 +359,7 @@ export class MeetingsService {
 
     let videoUrl: string | null = null;
     if (meeting.videoObjectKey) {
-      try {
-        const downloadRes = await this.storageService.createDownloadUrl(meeting.videoObjectKey);
-        videoUrl = typeof downloadRes === "string" ? downloadRes : downloadRes.url;
-      } catch (err) {
-        this.logger.warn(`Could not get signed URL for ${meeting.videoObjectKey}: ${(err as Error).message}`);
-      }
+      videoUrl = `/api/meetings/${meeting.id}/video`;
     }
 
     return {
@@ -376,6 +371,55 @@ export class MeetingsService {
       transcriptUrl: `/api/meetings/${meeting.id}/transcript`,
       analysisStatus: meeting.status.toLowerCase() as MeetingStatus,
     };
+  }
+
+  async getVideoStream(meetingId: string, range?: string) {
+    const meeting = await this.getMeeting(meetingId);
+    if (!meeting.videoObjectKey) {
+      throw new NotFoundException("Video not found");
+    }
+
+    try {
+      const metadata = await this.storageService.headObject(meeting.videoObjectKey);
+      const totalSize = metadata.ContentLength || 0;
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+        const chunksize = (end - start) + 1;
+
+        const buffer = await this.storageService.getObjectBuffer(
+          meeting.videoObjectKey,
+          `bytes=${start}-${end}`
+        );
+
+        return {
+          statusCode: 206,
+          headers: {
+            "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+            "Accept-Ranges": "bytes",
+            "Content-Length": chunksize,
+            "Content-Type": "video/mp4",
+          },
+          streamOrBuffer: buffer,
+        };
+      } else {
+        const stream = await this.storageService.getObjectStream(meeting.videoObjectKey);
+        return {
+          statusCode: 200,
+          headers: {
+            "Content-Length": totalSize,
+            "Content-Type": "video/mp4",
+            "Accept-Ranges": "bytes",
+          },
+          streamOrBuffer: stream,
+        };
+      }
+    } catch (err: any) {
+      this.logger.error(`Error fetching video stream for ${meetingId}: ${err.message}`);
+      throw new InternalServerErrorException(`Could not stream video: ${err.message}`);
+    }
   }
 
   async getTranscript(meetingId: string) {

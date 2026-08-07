@@ -7,6 +7,7 @@ import {
   Headers,
   UseGuards,
   Req,
+  Res,
 } from "@nestjs/common";
 import { MeetingsService } from "./meetings.service";
 import { CreateMeetingDto } from "./dto/create-meeting.dto";
@@ -59,6 +60,24 @@ export class MeetingsController {
   @Get(":meetingId/playback")
   async getPlayback(@Param("meetingId") meetingId: string) {
     return this.meetingsService.getPlayback(meetingId);
+  }
+
+  @Get(":meetingId/video")
+  async streamVideo(
+    @Param("meetingId") meetingId: string,
+    @Headers("range") range: string,
+    @Res() res: any,
+  ) {
+    const { statusCode, headers, streamOrBuffer } = await this.meetingsService.getVideoStream(meetingId, range);
+    if (!streamOrBuffer) {
+      return res.status(404).send("Video content is unavailable");
+    }
+    res.status(statusCode).set(headers);
+    if (Buffer.isBuffer(streamOrBuffer)) {
+      res.end(streamOrBuffer);
+    } else {
+      (streamOrBuffer as any).pipe(res);
+    }
   }
 
   @Get(":meetingId/transcript")
